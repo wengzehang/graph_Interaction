@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from utils.util import R_2vect, Global2Local, Local2Global
 import os
-from torch_geometric.nn import MetaLayer
+# from torch_geometric.nn import MetaLayer
 
 class BagDataset(Dataset):
     def __init__(self, h5_file=None, topo_file=None, kpset=None, mintimegap=1, float_type=np.float32, align_axis=np.array([1,0,0]), rand_seed=1234):
@@ -93,6 +93,9 @@ class BagDataset(Dataset):
         pos_effector = effector_info[:3]
         radius_effector = effector_info[3]
 
+        effector_info_future = self.effector_data[sampleindex_seq, sampleindex_frame+self.mintimegap][0]
+        pos_effector_future = effector_info_future[:3]
+
 
         # return a single frame
         # data_xt = self.full_data[self.mesh_key][sampleindex_seq,
@@ -116,7 +119,7 @@ class BagDataset(Dataset):
             data_xt_speed = data_xt - data_xt_history
 
 
-        return data_xt, data_xt_future, data_xt_speed, move_direction, R, pos_effector, radius_effector
+        return data_xt, data_xt_future, data_xt_speed, pos_effector, pos_effector_future, radius_effector, move_direction, R
 
 if __name__ == '__main__':
     trainmode = "test"
@@ -134,9 +137,6 @@ if __name__ == '__main__':
     # keypoint index set
     kpset = [ 759, 545, 386, 1071, 429, 943,  820,1013, 1124,1212, 1269, 674, 685, 1236]#,       632, 203, 250, 699  ]
 
-    visid = 2 # video id for visualization
-    frameid = 0
-    visframenum = 41
     mintimegap = 1
 
     bagSet = BagDataset(dataset_filename,  topopath, kpset=kpset, mintimegap=mintimegap, float_type=np.float32, rand_seed=1234)
@@ -147,7 +147,7 @@ if __name__ == '__main__':
         shuffle=True  # False
     )
 
-    for i in range(10000):
+    for i in range(100):
         print(i)
         data = next(iter(train_loader))
         print(data[0].shape)
