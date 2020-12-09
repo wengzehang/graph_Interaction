@@ -1,13 +1,7 @@
-# Python module imports.
 import math
 import numpy as np
 
 def R_2vect(vector_target, vector_base):
-    # shift vector
-    # shift_vec = start_pos
-
-    # use vector_target as vector_base
-
     # R
     R = np.zeros((3,3))
 
