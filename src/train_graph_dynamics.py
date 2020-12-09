@@ -3,13 +3,10 @@ tools for reading data
 '''
 
 from __future__ import print_function
-import h5py
 import numpy as np
 import os
-import pickle
 import torch
 from utils.loaddata import BagDataset
-from global_local import R_2vect, Global2Local, Local2Global
 
 if __name__ == '__main__':
     trainmode = "test"
@@ -22,7 +19,9 @@ if __name__ == '__main__':
     ballin = "out"
 
     # Change to correct $PATH$
-    folder = "/Users/cat/Downloads/dataset/bag_scene1/"
+    # folder = "/Users/cat/Downloads/dataset/bag_scene1/"
+    folder = "/media/zehang/New Volume/code/H5Bag_G/data/"
+
     h5name = "{}_{}_{}_{}_{}_{}_{}_scene1.h5".format(trainmode,objtype, effectortype,ltype,rtype,materialtype,ballin)
     pklname = 'topo_{}.pkl'.format(trainmode)
 
@@ -40,3 +39,7 @@ if __name__ == '__main__':
         batch_size=5,
         shuffle=True  # False
     )
+
+    for batchid, data in enumerate(train_loader):
+        print(batchid)
+        
