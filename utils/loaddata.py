@@ -6,6 +6,11 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from utils.util import R_2vect, Global2Local, Local2Global
 import os
+import itertools
+
+
+
+
 # from torch_geometric.nn import MetaLayer
 
 class BagDataset(Dataset):
@@ -50,6 +55,9 @@ class BagDataset(Dataset):
             kpset.sort()
             self.kpset = kpset
 
+        self.numkp = len(kpset)
+        self.numnode = self.numkp + 1 # no extra rigid object
+
         self.numVideo = len(self.validVideoInd)
         # number of frames per video
         self.numFrame = self.full_data[self.mesh_key].shape[1]
@@ -79,6 +87,10 @@ class BagDataset(Dataset):
         return len(self.pc_data_index)
 
     def __getitem__(self, idx):
+        edge_index = np.array([i for i in itertools.product(np.arange(self.numnode), repeat=2)]).transpose()
+        # tensor_edge_index_conti = torch.tensor(edge_index).contiguous()
+        # tensor_edge_index = torch.tensor(edge_index)
+
         # get the video id in the original h5 file
         sampleindex_seq = self.pc_data_index[idx] // self.numFrame
         sampleindex_seq = self.validVideoInd[sampleindex_seq]
@@ -86,40 +98,101 @@ class BagDataset(Dataset):
         # get the frame id in the video
         sampleindex_frame = self.pc_data_index[idx] % self.numFrame
 
-        # pushing direction
-        move_direction = self.effector_dir[sampleindex_seq][0]
-        R = R_2vect(self.align_axis, move_direction)
-        effector_info = self.effector_data[sampleindex_seq, sampleindex_frame][0]
-        pos_effector = effector_info[:3]
-        radius_effector = effector_info[3]
-
-        effector_info_future = self.effector_data[sampleindex_seq, sampleindex_frame+self.mintimegap][0]
-        pos_effector_future = effector_info_future[:3]
-
-
-        # return a single frame
-        # data_xt = self.full_data[self.mesh_key][sampleindex_seq,
-        #                   sampleindex_frame, :].reshape(self.numPoint,3).T.astype(self.float_type)
-
-        data_xt = self.mesh_data[sampleindex_seq,
+        # get cloth frame
+        # current
+        data_xt_current = self.mesh_data[sampleindex_seq,
                           sampleindex_frame, self.kpset, :].reshape(-1,3).astype(self.float_type)
 
+        # future
         data_xt_future = self.mesh_data[sampleindex_seq,
                           sampleindex_frame+self.mintimegap, self.kpset, :].reshape(-1,3).astype(self.float_type)
-
-        data_xt = Global2Local(pos_effector, R, data_xt)
-        data_xt_future = Global2Local(pos_effector, R, data_xt_future)
-
-        if sampleindex_frame == 0:
-            data_xt_speed = np.zeros_like(data_xt)
+        # past
+        # if sampleindex_frame == 0:
+        if sampleindex_frame < self.mintimegap:
+            data_xt_past = data_xt_current
         else:
-            data_xt_history = self.mesh_data[sampleindex_seq,
-                          sampleindex_frame-1, self.kpset, :].reshape(-1,3).astype(self.float_type)
-            data_xt_history = Global2Local(pos_effector, R, data_xt_history)
-            data_xt_speed = data_xt - data_xt_history
+            data_xt_past = self.mesh_data[sampleindex_seq,
+                           sampleindex_frame - self.mintimegap, self.kpset, :].reshape(-1, 3).astype(self.float_type)
+
+        ##############################3
+        # effector
+        # current
+        move_direction = self.effector_dir[sampleindex_seq][0]
+        R = R_2vect(self.align_axis, move_direction)
+        effector_info_current = self.effector_data[sampleindex_seq, sampleindex_frame][0]
+
+        pos_effector_current = effector_info_current[:3].reshape(1,3)
+        radius_effector_current = effector_info_current[3]
+
+        # future
+        effector_info_future = self.effector_data[sampleindex_seq, sampleindex_frame+self.mintimegap][0]
+        pos_effector_future = effector_info_future[:3].reshape(1,3)
+        # past
+        # if sampleindex_frame == 0:
+        if sampleindex_frame < self.mintimegap:
+            effector_info_past = effector_info_current
+
+            # pos_effector_speed = np.zeros_like(pos_effector)
+        else:
+            effector_info_past = self.effector_data[sampleindex_seq, sampleindex_frame-self.mintimegap][0]
+        pos_effector_past = effector_info_current[:3]
+            # pos_effector_speed = pos_effector - pos_effector_past
+
+        pos_effector_past = effector_info_past[:3].reshape(1,3)
 
 
-        return data_xt, data_xt_future, data_xt_speed, pos_effector, pos_effector_future, radius_effector, move_direction, R
+        # convert global info to local info
+
+        data_xt_past = Global2Local(pos_effector_current, R, data_xt_past)
+        data_xt_current = Global2Local(pos_effector_current, R, data_xt_current)
+        data_xt_future = Global2Local(pos_effector_current, R, data_xt_future)
+
+        pos_effector_current = Global2Local(pos_effector_current, R, pos_effector_current) # 0,0,0
+        pos_effector_future = Global2Local(pos_effector_current, R, pos_effector_future)
+        pos_effector_past = Global2Local(pos_effector_current, R, pos_effector_past)
+
+
+        data_xt_current_speed = data_xt_current - data_xt_past
+        data_xt_future_speed = data_xt_future - data_xt_current
+        pos_effector_current_speed = pos_effector_current - pos_effector_past
+        pos_effector_future_speed = pos_effector_future - pos_effector_current
+
+
+        # construct the cloth particle graph node with attributes
+        radiusarray = 0.001*np.ones(self.numkp).reshape(-1,1)
+        undercontrol = np.zeros(self.numkp).reshape(-1,1)
+        # future pos, assume it is unknown
+        data_xt_movetowards = np.zeros((self.numkp, 3))
+
+        clothnode = np.hstack((data_xt_current,data_xt_current_speed, radiusarray, undercontrol, data_xt_movetowards))
+
+        # effector
+        effector_node_array = np.zeros((1,11))
+        effector_node_array[0, 0:3] = pos_effector_current
+        effector_node_array[0, 3:6] = pos_effector_current_speed
+        effector_node_array[0, 6] = radius_effector_current
+        effector_node_array[0, 7] = 1.0
+        effector_node_array[0, 8:11] = pos_effector_future_speed
+        effectornode = effector_node_array
+
+        # source input graph
+        sourcegraph = np.vstack((clothnode, effectornode))
+
+        # target subgraph, predicting ground truth
+        # targetgraph = data_xt_future
+        targetgraph = np.vstack((data_xt_future, pos_effector_future))
+        # targetgraph_sub = np.hstack((data_xt_future,data_xt_future_speed, radiusarray, undercontrol, data_xt_movetowards))
+        # targetgraph = np.hstack((data_xt_future,data_xt_future_speed, radiusarray, undercontrol, data_xt_movetowards))
+
+
+        nodepos_source = sourcegraph[:,:3]
+        nodepos_target = targetgraph[:,:3]
+        source_edge_attr = nodepos_source[edge_index[0]] - nodepos_source[edge_index[1]]
+        target_edge_attr = nodepos_target[edge_index[0]] - nodepos_target[edge_index[1]]
+
+
+        return sourcegraph, targetgraph, edge_index, source_edge_attr, target_edge_attr
+        # return data_xt, data_xt_future, data_xt_speed, pos_effector_future, radius_effector, move_direction, R, sourcegraph, targetgraph_sub, targetgraph
 
 if __name__ == '__main__':
     trainmode = "test"
@@ -151,3 +224,4 @@ if __name__ == '__main__':
         print(i)
         data = next(iter(train_loader))
         print(data[0].shape)
+        print(data[1].shape)
