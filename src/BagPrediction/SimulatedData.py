@@ -11,6 +11,14 @@ import pickle
 from typing import List, Tuple
 
 
+# Dataset keys:
+MESH_KEY = 'posCloth'
+RIGID_KEY = 'posRigid'
+CLOTH_ID_KEY = 'clothid'
+RIGID_NUM_KEY = 'numRigid'
+EFFECTOR_KEY = 'posEffector'
+
+
 class Frame:
     def __init__(self, data: 'SimulatedData', scenario_index: int, frame_index: int):
         assert scenario_index >= 0
@@ -23,7 +31,7 @@ class Frame:
         self.frame_index = frame_index
 
     def get_cloth_keypoint_positions(self, indices):
-        mesh_vertices = self.data.dataset[SimulatedData.MESH_KEY][self.scenario_index][self.frame_index]
+        mesh_vertices = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
         return mesh_vertices[indices]
 
 
@@ -59,7 +67,7 @@ class SimulatedData:
         self.topodict = topodict
 
         # The 'posCloth' entry has shape ( #scenario_ids, #frames, #mesh_points, 4[xyz, r] )
-        shape = self.dataset[SimulatedData.MESH_KEY].shape
+        shape = self.dataset[MESH_KEY].shape
         self.num_scenarios = shape[0]
         self.num_frames = shape[1]
         self.num_mesh_points = shape[2]
@@ -75,13 +83,6 @@ class SimulatedData:
 
     def scenario(self, scenario_index: int) -> Scenario:
         return Scenario(self, scenario_index)
-
-    # Dataset keys:
-    MESH_KEY = 'posCloth'
-    RIGID_KEY = 'posRigid'
-    CLOTH_ID_KEY = 'clothid'
-    RIGID_NUM_KEY = 'numRigid'
-    EFFECTOR_KEY = 'posEffector'
 
 
 keypoint_indices = [

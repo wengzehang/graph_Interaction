@@ -7,7 +7,7 @@ from datetime import datetime
 import numpy as np
 from typing import List, Union, Tuple
 
-from SimulatedData import SimulatedData
+import SimulatedData
 
 # TODO: This should be configurable
 kpset = [759, 545, 386, 1071, 429, 943, 820, 1013, 1124, 1212, 1269, 674, 685, 1236]
