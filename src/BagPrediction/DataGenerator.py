@@ -23,7 +23,6 @@ class DataGenerator:
         self.indices = [(scenario_index, frame_index)
                         for scenario_index in range(0, data.num_scenarios)
                         for frame_index in range(0, data.num_frames - 1)]
-        self.indices = shuffle(range(self.num_samples))
 
         self.generated_count = 0
 
