@@ -32,10 +32,10 @@ target_graphs = utils_tf.data_dicts_to_graphs_tuple([graph_dict])
 
 
 def make_mlp(layers):
-    model = tf.keras.models.Sequential()
-    for layer in layers:
-        model.add(keras.layers.Dense(layer))
-    return model
+    return snt.Sequential([
+        snt.nets.MLP(layers, activate_final=True),
+        snt.LayerNorm(axis=-1, create_offset=True, create_scale=True)
+    ])
 
 
 def snt_mlp(layers):
@@ -66,7 +66,7 @@ module = GraphNetworkModules.EncodeProcessDecode(
     make_core_edge_model=snt_mlp([64, 64]),
     make_core_node_model=snt_mlp([64, 64]),
     make_core_global_model=snt_mlp([64]),
-    num_processing_steps=2,
+    num_processing_steps=5,
     edge_output_size=3,
     node_output_size=3,
     global_output_size=1,
@@ -77,7 +77,7 @@ def update_step(inputs_tr, targets_tr):
     with tf.GradientTape() as tape:
         outputs_tr = module(inputs_tr)
         loss_tr = create_loss(targets_tr, outputs_tr)
-        loss_tr = tf.math.reduce_sum(loss_tr)
+        loss_tr = tf.math.reduce_sum(loss_tr) / module.num_processing_steps
 
     gradients = tape.gradient(loss_tr, module.trainable_variables)
     optimizer.apply(gradients, module.trainable_variables)
@@ -100,7 +100,7 @@ compiled_update_step = tf.function(update_step, input_signature=input_signature)
 
 log_every_seconds = 0.1
 last_log_time = time.time()
-for iteration in range(0, 5000):
+for iteration in range(0, 2000):
     last_iteration = iteration
     # TODO: Here, we should load data from the dataset (a batch)
     (inputs_tr, targets_tr) = input_graphs, target_graphs
