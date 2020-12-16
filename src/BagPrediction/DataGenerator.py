@@ -25,6 +25,7 @@ class DataGenerator:
                         for frame_index in range(0, data.num_frames - 1)]
 
         self.generated_count = 0
+        self.has_reshuffled = False
 
     def next_batch(self, batch_size: int) -> Tuple:
         dataset_size = self.num_samples
@@ -36,6 +37,9 @@ class DataGenerator:
             print("Reshuffling")
             self.indices = shuffle(self.indices)
             self.generated_count = 0
+            self.has_reshuffled = True
+        else:
+            self.has_reshuffled = False
 
         input_dicts = [None] * batch_size
         target_dicts = [None] * batch_size
