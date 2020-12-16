@@ -5,6 +5,7 @@ Graph network module
 import tensorflow as tf
 import sonnet as snt
 import time
+import os
 
 from graph_nets import utils_tf
 
@@ -101,6 +102,20 @@ compiled_compute_output_and_loss = tf.function(compute_output_and_loss)
 # Checkpoint stuff
 model_path = "./models/test-1"
 checkpoint_root = model_path + "/checkpoints"
+checkpoint_name = "checkpoint-1"
+checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
+
+# Make sure the model path exists
+if not os.path.exists(model_path):
+    os.makedirs(model_path)
+
+checkpoint = tf.train.Checkpoint(module=module)
+latest = tf.train.latest_checkpoint(checkpoint_root)
+if latest is not None:
+    print("Loading latest checkpoint: ", latest)
+    checkpoint.restore(latest)
+else:
+    print("No checkpoint found. Beginning training from scratch.")
 
 # How many training steps before we do a validation run (+ checkpoint)
 train_steps_per_validation = 100
@@ -118,5 +133,7 @@ for iteration in range(0, 2000):
     # Calculate validation loss
     (inputs_val, targets_val) = valid_generator.next_batch(validation_batch_size)
     outputs_val, loss_val = compiled_compute_output_and_loss(inputs_val, targets_val)
+
+    checkpoint.save(checkpoint_save_prefix)
 
     print("# {:05d}, Loss Train {:.4f}, Loss Valid {:.4f}".format(iteration, loss_tr.numpy(), loss_val.numpy()))
