@@ -274,7 +274,7 @@ module = GraphNetworkModules.EncodeProcessDecode(
     num_processing_steps=5,
     edge_output_size=3,
     node_output_size=3,
-    global_output_size=1,
+    global_output_size=7, # TODO: Modify to adaptive different global feat lengh
 )
 
 if __name__ == '__main__':
@@ -296,7 +296,7 @@ if __name__ == '__main__':
     num_processing_steps = 5
 
     # Checkpoint stuff
-    model_path = "./models/test-1"
+    model_path = "./models/test-4"
     checkpoint_root = model_path + "/checkpoints"
     checkpoint_name = "checkpoint-1"
     checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
@@ -317,20 +317,57 @@ if __name__ == '__main__':
 
     prev_input_graph_tuples = None
     # for i_scenario in range(newdata.num_scenarios):
-    for i_scenario in range(10):
+    # only select 5 scenarios for visualization
+    for i_scenario in range(5):
         print("done with {} scene.".format(i_scenario))
         for i_frame in range(newdata.num_frames):
+            # if i_frame % 3 == 0:
             if i_frame == 0:
+                # copy the first frame as a start point
                 scenario = newdata.scenario(i_scenario)
                 prev_frame = scenario.frame(i_frame)
-                prev_graph_dict = representation.to_graph_dict(prev_frame)
+                # the future position of effector is used
+                next_frame = scenario.frame(i_frame+1)
+                prev_graph_dict = representation.to_graph_dict_global_7(prev_frame, next_frame.get_effector_pose())
                 prev_input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([prev_graph_dict])
             else:
+                # for the rest of frames, use the pre-estimated frame as input
                 current_predict_tuples = compute_output(module=graphmodule, inputs_tr=prev_input_graph_tuples)
+                # FIXME: Use the last processed graph output info to construct the next input, I re-calculate the edge attributes, and use the ground-truth effector position
+                current_receivers = np.float32(current_predict_tuples[-1].nodes.numpy()[current_predict_tuples[-1].receivers.numpy()])
+                current_senders = np.float32(current_predict_tuples[-1].nodes.numpy()[current_predict_tuples[-1].senders.numpy()])
+                newedge = current_receivers - current_senders
+                gt_current_frame = newdata.scenario(i_scenario).frame(i_frame) # use to get the latest effector position
+                gt_current_effector_pose = np.float32(gt_current_frame.get_effector_pose()).reshape(4) # use to replace the latest effector position
+                if (i_frame < newdata.num_frames-1):
+                    # for normal frame, we use the next frame info to get the target effector position
+                    gt_next_frame = newdata.scenario(i_scenario).frame(i_frame+1)
+                    gt_next_effector_pose = np.float32(gt_next_frame.get_effector_pose()).reshape(4)
+                else:
+                    # for the last frame, we generate a position by using previous two frames
+                    gt_prev_frame = newdata.scenario(i_scenario).frame(i_frame-1)
+                    prev_frame_effector = np.float32(gt_prev_frame.get_effector_pose()).reshape(4)
+                    gt_next_effector_pose = gt_current_effector_pose * 2 - prev_frame_effector
+                # construct the new global feat
+                new_global = np.float32(np.zeros(7))
+                new_global[:3] = gt_current_effector_pose[:3]
+                new_global[3:6] = gt_next_effector_pose[:3]
+                new_global[6] = gt_current_effector_pose[3]  # radius
 
+                current_graph_dict ={
+                    "globals": new_global,  # TODO: Fill global field with action parameter
+                    "nodes": current_predict_tuples[-1].nodes.numpy(),
+                    "edges": newedge,
+                    "senders": representation.keypoint_edges_from, # remains the same
+                    "receivers": representation.keypoint_edges_to, # remains the same
+                }
+
+                # replace the node position for rendering
                 data_vis.dataset_cloth[i_scenario][i_frame][
                         representation.keypoint_indices] = current_predict_tuples[-1].nodes
-                prev_input_graph_tuples = current_predict_tuples[-1]
+
+                # Update the next round input
+                prev_input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([current_graph_dict])
 
 
     data_vis.run()

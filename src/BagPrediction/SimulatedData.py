@@ -34,6 +34,11 @@ class Frame:
         mesh_vertices = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
         return mesh_vertices[indices]
 
+    def get_effector_pose(self):
+        # function to get effector info of current frame
+        effector_pose = self.data.dataset[EFFECTOR_KEY][self.scenario_index][self.frame_index]
+        return effector_pose
+
 
 class Scenario:
     def __init__(self, data: 'SimulatedData', scenario_index: int):
@@ -71,6 +76,8 @@ class SimulatedData:
         self.num_scenarios = shape[0]
         self.num_frames = shape[1]
         self.num_mesh_points = shape[2]
+
+        # The 'posEffector' entry has shape ( #scenario_ids, #frames, #1, 4[xyz, r]  )
 
     @staticmethod
     def load(path_to_topodict: str, path_to_dataset: str) -> 'SimulatedData':

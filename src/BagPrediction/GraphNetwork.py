@@ -42,8 +42,12 @@ def snt_mlp(layers):
 
 def create_loss(target, outputs):
     losses = [
+        # FIXME: Add an additional mse loss for comparing the global features
+        # tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
+        # tf.compat.v1.losses.mean_squared_error(target.edges, output.edges)
         tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
-        tf.compat.v1.losses.mean_squared_error(target.edges, output.edges)
+        tf.compat.v1.losses.mean_squared_error(target.edges, output.edges) +
+        tf.compat.v1.losses.mean_squared_error(target.globals, output.globals)
         for output in outputs
     ]
     return tf.stack(losses)
@@ -64,7 +68,7 @@ module = GraphNetworkModules.EncodeProcessDecode(
     num_processing_steps=5,
     edge_output_size=3,
     node_output_size=3,
-    global_output_size=1,
+    global_output_size=7, # TODO: Modify the length of global feature vector
 )
 
 
@@ -100,7 +104,7 @@ compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_output_and_loss = tf.function(compute_output_and_loss)
 
 # Checkpoint stuff
-model_path = "./models/test-1"
+model_path = "./models/test-4"
 checkpoint_root = model_path + "/checkpoints"
 checkpoint_name = "checkpoint-1"
 checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)

@@ -62,7 +62,15 @@ class DataGenerator:
 
         # This method should be overridden by derived classes to define different attribute structures
         # TODO: Do we need access to the previous frame?
-        current_graph = self.representation.to_graph_dict(current_frame)
-        next_graph = self.representation.to_graph_dict(next_frame)
+        # current_graph = self.representation.to_graph_dict(current_frame)
+        # next_graph = self.representation.to_graph_dict(next_frame)
+
+        # FIXME: Modify the node attributes, for the graph global features, we use the current and future effector POSE, with the radius
+        # FIXME: For the target graph global features, we use the moving direction to calculate a pseudo effector position
+        current_frame_effector = current_frame.get_effector_pose()
+        next_frame_effector = next_frame.get_effector_pose()
+        potential_future_frame_effector = next_frame_effector*2 - current_frame_effector
+        current_graph = self.representation.to_graph_dict_global_7(current_frame, next_frame_effector)
+        next_graph = self.representation.to_graph_dict_global_7(next_frame, potential_future_frame_effector)
         return current_graph, next_graph
 
