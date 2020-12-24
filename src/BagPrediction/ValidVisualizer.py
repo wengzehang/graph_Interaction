@@ -274,14 +274,14 @@ module = GraphNetworkModules.EncodeProcessDecode(
     num_processing_steps=5,
     edge_output_size=3,
     node_output_size=3,
-    global_output_size=7, # TODO: Modify to adaptive different global feat lengh
+    global_output_size=4, # TODO: Modify to adaptive different global feat lengh
 )
 
 if __name__ == '__main__':
     # valid_path_to_topodict = 'h5data/topo_valid.pkl'
     # valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1.h5'
-    valid_path_to_topodict = 'h5data/topo_train.pkl'
-    valid_path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1.h5'
+    valid_path_to_topodict = 'h5data/topo_test.pkl'
+    valid_path_to_dataset = 'h5data/test_sphere_sphere_f_f_soft_out_scene1.h5'
 
     representation = GraphRepresentation.GraphRepresentation(SimulatedData.keypoint_indices,
                                                              SimulatedData.keypoint_edges)
@@ -296,7 +296,7 @@ if __name__ == '__main__':
     num_processing_steps = 5
 
     # Checkpoint stuff
-    model_path = "./models/test-4"
+    model_path = "./models/test-6"
     checkpoint_root = model_path + "/checkpoints"
     checkpoint_name = "checkpoint-1"
     checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
@@ -318,45 +318,70 @@ if __name__ == '__main__':
     prev_input_graph_tuples = None
     # for i_scenario in range(newdata.num_scenarios):
     # only select 5 scenarios for visualization
-    for i_scenario in range(5):
+    for i_scenario in range(50):
         print("done with {} scene.".format(i_scenario))
         for i_frame in range(newdata.num_frames):
             # if i_frame % 3 == 0:
+            # if i_frame % 3 == 0 and (i_frame < newdata.num_frames-1):
             if i_frame == 0:
                 # copy the first frame as a start point
                 scenario = newdata.scenario(i_scenario)
                 prev_frame = scenario.frame(i_frame)
                 # the future position of effector is used
                 next_frame = scenario.frame(i_frame+1)
-                prev_graph_dict = representation.to_graph_dict_global_7(prev_frame, next_frame.get_effector_pose())
+
+                # prev_graph_dict = representation.to_graph_dict_global_7(prev_frame, next_frame.get_effector_pose())
+                prev_graph_dict = representation.to_graph_dict_global_4_align(prev_frame, next_frame.get_effector_pose(), prev_frame.get_effector_pose()[0][:3])
                 prev_input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([prev_graph_dict])
             else:
-                # for the rest of frames, use the pre-estimated frame as input
-                current_predict_tuples = compute_output(module=graphmodule, inputs_tr=prev_input_graph_tuples)
-                # FIXME: Use the last processed graph output info to construct the next input, I re-calculate the edge attributes, and use the ground-truth effector position
-                current_receivers = np.float32(current_predict_tuples[-1].nodes.numpy()[current_predict_tuples[-1].receivers.numpy()])
-                current_senders = np.float32(current_predict_tuples[-1].nodes.numpy()[current_predict_tuples[-1].senders.numpy()])
-                newedge = current_receivers - current_senders
-                gt_current_frame = newdata.scenario(i_scenario).frame(i_frame) # use to get the latest effector position
-                gt_current_effector_pose = np.float32(gt_current_frame.get_effector_pose()).reshape(4) # use to replace the latest effector position
+
+                # use to recover the output
+                gt_prev_frame = newdata.scenario(i_scenario).frame(
+                    i_frame - 1)  # use to get the previous input effector position
+                gt_prev_effector_pose = np.float32(gt_prev_frame.get_effector_pose()).reshape(4)
+                gt_current_frame = newdata.scenario(i_scenario).frame(
+                    i_frame)  # use to get the latest effector position
+                gt_current_effector_pose = np.float32(gt_current_frame.get_effector_pose()).reshape(
+                    4)
                 if (i_frame < newdata.num_frames-1):
                     # for normal frame, we use the next frame info to get the target effector position
                     gt_next_frame = newdata.scenario(i_scenario).frame(i_frame+1)
                     gt_next_effector_pose = np.float32(gt_next_frame.get_effector_pose()).reshape(4)
                 else:
                     # for the last frame, we generate a position by using previous two frames
-                    gt_prev_frame = newdata.scenario(i_scenario).frame(i_frame-1)
+                    # be careful about the radius, radius = 2*radius - radius
                     prev_frame_effector = np.float32(gt_prev_frame.get_effector_pose()).reshape(4)
                     gt_next_effector_pose = gt_current_effector_pose * 2 - prev_frame_effector
+
+
+                # for the rest of frames, use the pre-estimated frame as input
+                current_predict_tuples = compute_output(module=graphmodule, inputs_tr=prev_input_graph_tuples)
+                # FIXME: Use the last processed graph output info to construct the next input, I re-calculate the edge attributes, and use the ground-truth effector position
+
+                # replace the node position for rendering
+                current_node_recover = current_predict_tuples[-1].nodes.numpy() + gt_prev_effector_pose[:3]
+                data_vis.dataset_cloth[i_scenario][i_frame][
+                        representation.keypoint_indices] = current_node_recover
+
+                # construct the next input graph
+                current_node_align = current_node_recover - gt_current_effector_pose[:3]
+                current_receivers = np.float32(current_node_align[current_predict_tuples[-1].receivers.numpy()])
+                current_senders = np.float32(current_node_align[current_predict_tuples[-1].senders.numpy()])
+                newedge = current_receivers - current_senders
+
                 # construct the new global feat
-                new_global = np.float32(np.zeros(7))
-                new_global[:3] = gt_current_effector_pose[:3]
-                new_global[3:6] = gt_next_effector_pose[:3]
-                new_global[6] = gt_current_effector_pose[3]  # radius
+                # new_global = np.float32(np.zeros(7))
+                # new_global[:3] = gt_current_effector_pose[:3]
+                # new_global[3:6] = gt_next_effector_pose[:3]
+                # new_global[6] = gt_current_effector_pose[3]  # radius
+                new_global = gt_next_effector_pose
+                # align
+                new_global[:3] -= gt_current_effector_pose[:3]
+                # positions = current_predict_tuples[-1].nodes.numpy() - gt_current_effector_pose[:3]
 
                 current_graph_dict ={
                     "globals": new_global,  # TODO: Fill global field with action parameter
-                    "nodes": current_predict_tuples[-1].nodes.numpy(),
+                    "nodes": current_node_align, # current_predict_tuples[-1].nodes.numpy(),
                     "edges": newedge,
                     "senders": representation.keypoint_edges_from, # remains the same
                     "receivers": representation.keypoint_edges_to, # remains the same
@@ -364,7 +389,7 @@ if __name__ == '__main__':
 
                 # replace the node position for rendering
                 data_vis.dataset_cloth[i_scenario][i_frame][
-                        representation.keypoint_indices] = current_predict_tuples[-1].nodes
+                        representation.keypoint_indices] = current_node_recover# current_predict_tuples[-1].nodes
 
                 # Update the next round input
                 prev_input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([current_graph_dict])

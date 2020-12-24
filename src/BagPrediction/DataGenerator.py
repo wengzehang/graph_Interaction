@@ -67,10 +67,13 @@ class DataGenerator:
 
         # FIXME: Modify the node attributes, for the graph global features, we use the current and future effector POSE, with the radius
         # FIXME: For the target graph global features, we use the moving direction to calculate a pseudo effector position
-        current_frame_effector = current_frame.get_effector_pose()
-        next_frame_effector = next_frame.get_effector_pose()
-        potential_future_frame_effector = next_frame_effector*2 - current_frame_effector
-        current_graph = self.representation.to_graph_dict_global_7(current_frame, next_frame_effector)
-        next_graph = self.representation.to_graph_dict_global_7(next_frame, potential_future_frame_effector)
+        current_frame_effector = current_frame.get_effector_pose().reshape(4)
+        next_frame_effector = next_frame.get_effector_pose().reshape(4)
+        potential_future_frame_effector = next_frame_effector*2 - current_frame_effector # be careful about the radius
+        potential_future_frame_effector[3] = next_frame_effector[3]
+        # current_graph = self.representation.to_graph_dict_global_7(current_frame, next_frame_effector)
+        # next_graph = self.representation.to_graph_dict_global_7(next_frame, potential_future_frame_effector)
+        current_graph = self.representation.to_graph_dict_global_4_align(current_frame, next_frame_effector, current_frame_effector[:3])
+        next_graph = self.representation.to_graph_dict_global_4_align(next_frame, potential_future_frame_effector, current_frame_effector[:3])
         return current_graph, next_graph
 

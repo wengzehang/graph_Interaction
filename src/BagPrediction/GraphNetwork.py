@@ -40,14 +40,19 @@ def snt_mlp(layers):
     return lambda: make_mlp(layers)
 
 
-def create_loss(target, outputs):
+def create_loss(target, outputs, input):
     losses = [
         # FIXME: Add an additional mse loss for comparing the global features
         # tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
         # tf.compat.v1.losses.mean_squared_error(target.edges, output.edges)
+
+        # tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
+        # tf.compat.v1.losses.mean_squared_error(target.edges, output.edges) +
+        # tf.compat.v1.losses.mean_squared_error(target.globals, output.globals)
+
         tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
         tf.compat.v1.losses.mean_squared_error(target.edges, output.edges) +
-        tf.compat.v1.losses.mean_squared_error(target.globals, output.globals)
+        tf.compat.v1.losses.mean_squared_error(target.globals, input.globals)
         for output in outputs
     ]
     return tf.stack(losses)
@@ -68,13 +73,14 @@ module = GraphNetworkModules.EncodeProcessDecode(
     num_processing_steps=5,
     edge_output_size=3,
     node_output_size=3,
-    global_output_size=7, # TODO: Modify the length of global feature vector
+    global_output_size=4, # TODO: Modify the length of global feature vector
 )
 
 
 def compute_output_and_loss(inputs_tr, targets_tr):
     outputs_tr = module(inputs_tr)
-    loss_tr = create_loss(targets_tr, outputs_tr)
+    # loss_tr = create_loss(targets_tr, outputs_tr)
+    loss_tr = create_loss(targets_tr, outputs_tr, inputs_tr)
     loss_tr = tf.math.reduce_sum(loss_tr) / module.num_processing_steps
     return outputs_tr, loss_tr
 
@@ -104,7 +110,7 @@ compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_output_and_loss = tf.function(compute_output_and_loss)
 
 # Checkpoint stuff
-model_path = "./models/test-4"
+model_path = "./models/test-6" # 4 for 7, 5 for 4 align
 checkpoint_root = model_path + "/checkpoints"
 checkpoint_name = "checkpoint-1"
 checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
