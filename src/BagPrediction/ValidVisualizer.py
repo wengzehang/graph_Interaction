@@ -281,6 +281,7 @@ if __name__ == '__main__':
     # valid_path_to_topodict = 'h5data/topo_valid.pkl'
     # valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1.h5'
     valid_path_to_topodict = 'h5data/topo_test.pkl'
+    # valid_path_to_dataset = 'h5data/test_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
     valid_path_to_dataset = 'h5data/test_sphere_sphere_f_f_soft_out_scene1.h5'
 
     representation = GraphRepresentation.GraphRepresentation(SimulatedData.keypoint_indices,
@@ -318,7 +319,7 @@ if __name__ == '__main__':
     prev_input_graph_tuples = None
     # for i_scenario in range(newdata.num_scenarios):
     # only select 5 scenarios for visualization
-    for i_scenario in range(50):
+    for i_scenario in range(10):
         print("done with {} scene.".format(i_scenario))
         for i_frame in range(newdata.num_frames):
             # if i_frame % 3 == 0:
@@ -387,9 +388,9 @@ if __name__ == '__main__':
                     "receivers": representation.keypoint_edges_to, # remains the same
                 }
 
-                # replace the node position for rendering
-                data_vis.dataset_cloth[i_scenario][i_frame][
-                        representation.keypoint_indices] = current_node_recover# current_predict_tuples[-1].nodes
+                # # replace the node position for rendering
+                # data_vis.dataset_cloth[i_scenario][i_frame][
+                #         representation.keypoint_indices] = current_node_recover# current_predict_tuples[-1].nodes
 
                 # Update the next round input
                 prev_input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([current_graph_dict])

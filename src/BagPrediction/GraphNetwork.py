@@ -15,10 +15,10 @@ import GraphNetworkModules
 import DataGenerator
 
 train_path_to_topodict = 'h5data/topo_train.pkl'
-train_path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1.h5'
+train_path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
 
 valid_path_to_topodict = 'h5data/topo_valid.pkl'
-valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1.h5'
+valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
 
 train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
 train_generator = DataGenerator.DataGenerator(train_data)
@@ -50,9 +50,16 @@ def create_loss(target, outputs, input):
         # tf.compat.v1.losses.mean_squared_error(target.edges, output.edges) +
         # tf.compat.v1.losses.mean_squared_error(target.globals, output.globals)
 
-        tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
-        tf.compat.v1.losses.mean_squared_error(target.edges, output.edges) +
-        tf.compat.v1.losses.mean_squared_error(target.globals, input.globals)
+        # tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
+
+        # tf.compat.v1.losses.mean_squared_error(target.nodes[:,:3], output.nodes[:,:3]) +
+        # tf.compat.v1.losses.mean_squared_error(target.edges[:,:3], output.edges[:,:3]) +
+        # tf.compat.v1.losses.mean_squared_error(target.globals, input.globals)
+
+        # TODO: LOSS CHANGE
+        tf.compat.v1.losses.mean_squared_error(target.nodes[:,:3], output.nodes[:,:3]) +
+        tf.compat.v1.losses.mean_squared_error(target.edges[:,:3], output.edges[:,:3])
+
         for output in outputs
     ]
     return tf.stack(losses)
@@ -71,8 +78,8 @@ module = GraphNetworkModules.EncodeProcessDecode(
     make_core_node_model=snt_mlp([64, 64]),
     make_core_global_model=snt_mlp([64]),
     num_processing_steps=5,
-    edge_output_size=3,
-    node_output_size=3,
+    edge_output_size=4, # 3
+    node_output_size=5, # 3
     global_output_size=4, # TODO: Modify the length of global feature vector
 )
 
@@ -110,7 +117,7 @@ compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_output_and_loss = tf.function(compute_output_and_loss)
 
 # Checkpoint stuff
-model_path = "./models/test-6" # 4 for 7, 5 for 4 align
+model_path = "./models/test-11" # 4 for 7, 5 for 4 align, 8 for multi-object, 9 for multi-node-5, 11 for fully connected att graph
 checkpoint_root = model_path + "/checkpoints"
 checkpoint_name = "checkpoint-1"
 checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
@@ -129,7 +136,7 @@ else:
 
 # How many training steps before we do a validation run (+ checkpoint)
 train_steps_per_validation = 100
-validation_batch_size = valid_generator.num_samples
+validation_batch_size = 32# valid_generator.num_samples
 
 batch_size = 32
 log_every_seconds = 1

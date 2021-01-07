@@ -6,6 +6,7 @@ import random
 from typing import Tuple
 from sklearn.utils import shuffle
 from graph_nets import utils_tf
+import tensorflow as tf
 
 import SimulatedData
 import GraphRepresentation
@@ -18,8 +19,10 @@ class DataGenerator:
         # We can generate a sample from each adjacent frame pair
         self.num_samples = data.num_scenarios * (data.num_frames - 1)
 
-        self.representation = GraphRepresentation.GraphRepresentation(SimulatedData.keypoint_indices,
+        self.representation = GraphRepresentation.GraphRepresentation_rigid_deformable(SimulatedData.keypoint_indices,
                                                                       SimulatedData.keypoint_edges)
+
+
         self.indices = [(scenario_index, frame_index)
                         for scenario_index in range(0, data.num_scenarios)
                         for frame_index in range(0, data.num_frames - 1)]
@@ -69,7 +72,13 @@ class DataGenerator:
         # FIXME: For the target graph global features, we use the moving direction to calculate a pseudo effector position
         current_frame_effector = current_frame.get_effector_pose().reshape(4)
         next_frame_effector = next_frame.get_effector_pose().reshape(4)
+
+        # try:
         potential_future_frame_effector = next_frame_effector*2 - current_frame_effector # be careful about the radius
+        # except RuntimeWarning:
+        #     import pdb;
+        #     pdb.set_trace()
+
         potential_future_frame_effector[3] = next_frame_effector[3]
         # current_graph = self.representation.to_graph_dict_global_7(current_frame, next_frame_effector)
         # next_graph = self.representation.to_graph_dict_global_7(next_frame, potential_future_frame_effector)

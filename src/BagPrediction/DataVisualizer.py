@@ -105,6 +105,8 @@ class DataVisualizer:
             color_point[i] = np.array([0.8, 0.0, 0.0])
         color_point[self.keypoint_index] = np.array([1.0, 0.0, 0.0])
 
+        # color_point[[395, 550, 756, 436, 952, 1082]] = np.array([0.0, 0.8, 0.0])
+
         if self.show_cloth_mesh:
             cloth_pcd.points = open3d.utility.Vector3dVector(total_points)
             cloth_pcd.colors = open3d.utility.Vector3dVector(color_point)
@@ -249,10 +251,10 @@ class DataVisualizer:
 if __name__ == '__main__':
     path_to_topodict = 'h5data/topo_train.pkl'
     # path_to_dataset = 'h5data/train_sphere_sphere_m_r_soft_ballout.h5'
-    path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1.h5'
+    path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
     data = SimulatedData.SimulatedData.load(path_to_topodict, path_to_dataset)
 
-    scenario_index = 3
+    scenario_index = 101
     keypoint_indices = SimulatedData.keypoint_indices
     keypoint_edges = SimulatedData.keypoint_edges
     SimulatedData.validate_keypoint_graph(keypoint_indices, keypoint_edges)

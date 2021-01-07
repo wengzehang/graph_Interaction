@@ -8,6 +8,7 @@ The simulated data contains ...
 import h5py
 import pickle
 
+import numpy as np
 from typing import List, Tuple
 
 
@@ -29,15 +30,45 @@ class Frame:
         self.data = data
         self.scenario_index = scenario_index
         self.frame_index = frame_index
+        self.num_rigid = self.data.dataset[RIGID_NUM_KEY][self.scenario_index]
 
     def get_cloth_keypoint_positions(self, indices):
         mesh_vertices = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
         return mesh_vertices[indices]
 
+    def get_cloth_keypoint_info(self, indices, fix_indices):
+        mesh_frame = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
+        mesh_vertices = mesh_frame[indices]
+        num_keypoints = mesh_vertices.shape[0]
+        keypoint_radius = np.ones((num_keypoints, 1)) * 1e-5
+
+
+        inversedense = np.ones((mesh_frame.shape[0],1))
+        inversedense[fix_indices] = 0.0
+        inversedense = inversedense[indices]
+
+        mesh_vertices = np.hstack((mesh_vertices, keypoint_radius, inversedense))
+        # mesh_vertices = np.hstack((mesh_vertices, keypoint_radius)) #, inversedense))
+
+        # keypoint_undercontrol = np.zeros((num_keypoints, 1))
+        # mesh_vertices = np.hstack((mesh_vertices, keypoint_radius, keypoint_undercontrol))
+        return mesh_vertices
+
+    def get_rigid_keypoint_info(self):
+        rigid_vertices = self.data.dataset[RIGID_KEY][self.scenario_index][self.frame_index][:self.num_rigid,:]
+        inversedense = np.ones((rigid_vertices.shape[0],1))
+        rigid_vertices = np.hstack((rigid_vertices, inversedense))
+        return rigid_vertices
+
     def get_effector_pose(self):
         # function to get effector info of current frame
         effector_pose = self.data.dataset[EFFECTOR_KEY][self.scenario_index][self.frame_index]
         return effector_pose
+
+    def get_whole_edge(self):
+        # TODO: consider the effector and all the rigid sphere as graph nodes
+        # Return: a new list of edge connection containing rigid object
+        pass
 
 
 class Scenario:
@@ -76,6 +107,7 @@ class SimulatedData:
         self.num_scenarios = shape[0]
         self.num_frames = shape[1]
         self.num_mesh_points = shape[2]
+        self.num_rigid_object = 0
 
         # The 'posEffector' entry has shape ( #scenario_ids, #frames, #1, 4[xyz, r]  )
 
@@ -104,6 +136,9 @@ keypoint_indices = [
     # Bottom
     641
 ]
+
+fix_keypoint_indices = [395, 550, 756, 436, 952, 1082]
+fix_keypoint_place = [4, 7, 8, 15, 17, 18]
 
 keypoint_edges = [
     # Front edges
@@ -142,6 +177,7 @@ keypoint_edges = [
     (641, 127), (641, 4),
     (641, 67), (641, 150),
 ]
+
 
 
 def validate_keypoint_graph(indices: List[int], edges: List[Tuple[int, int]]):
