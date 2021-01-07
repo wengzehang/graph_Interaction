@@ -57,8 +57,7 @@ def create_loss(target, outputs, input):
         # tf.compat.v1.losses.mean_squared_error(target.globals, input.globals)
 
         # TODO: LOSS CHANGE
-        tf.compat.v1.losses.mean_squared_error(target.nodes[:,:3], output.nodes[:,:3]) +
-        tf.compat.v1.losses.mean_squared_error(target.edges[:,:3], output.edges[:,:3])
+        tf.compat.v1.losses.mean_squared_error(target.nodes[:,:3], output.nodes[:,:3])
 
         for output in outputs
     ]

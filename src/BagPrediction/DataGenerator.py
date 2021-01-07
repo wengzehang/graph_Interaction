@@ -82,7 +82,10 @@ class DataGenerator:
         potential_future_frame_effector[3] = next_frame_effector[3]
         # current_graph = self.representation.to_graph_dict_global_7(current_frame, next_frame_effector)
         # next_graph = self.representation.to_graph_dict_global_7(next_frame, potential_future_frame_effector)
-        current_graph = self.representation.to_graph_dict_global_4_align(current_frame, next_frame_effector, current_frame_effector[:3])
+        current_graph = self.representation.to_graph_dict_global_4_align(current_frame,
+                                                                         next_frame_effector,
+                                                                         current_frame_effector[:3],
+                                                                         add_noise=True)
         next_graph = self.representation.to_graph_dict_global_4_align(next_frame, potential_future_frame_effector, current_frame_effector[:3])
         return current_graph, next_graph
 
