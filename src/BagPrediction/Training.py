@@ -45,8 +45,10 @@ def create_squared_error(target, output):
 
 def create_loss_op(target_op, output_op):
     # Average mean squared error over node (only a single attribte)
-    errors = create_squared_error(target_op.nodes, output_op.nodes)
-    loss = tf.reduce_mean(errors)
+    #errors = create_squared_error(target_op.nodes, output_op.nodes)
+    #loss = tf.reduce_mean(errors)
+    cce = tf.keras.losses.CategoricalCrossentropy()
+    loss = cce(target_op.nodes, output_op.nodes)
     return loss
 
 
@@ -63,14 +65,14 @@ def create_accuracy_op(target_op, output_op):
 
 
 def create_node_output_label():
-    return snt.nets.MLP([1],
-                        activation=tf.nn.tanh,
+    return snt.nets.MLP([2],
+                        activation=tf.nn.softmax,
                         activate_final=True,
                         name="node_output")
 
 
 # Optimizer.
-learning_rate = 1e-3
+learning_rate = 1e-4
 optimizer = snt.optimizers.Adam(learning_rate)
 
 # Get some example data that resembles the tensors that will be fed
@@ -85,10 +87,10 @@ module = GraphNetworkModules.EncodeProcessDecode(
     make_core_edge_model=snt_mlp([64, 64]),
     make_core_node_model=snt_mlp([64, 64]),
     make_core_global_model=snt_mlp([64]),
-    num_processing_steps=5,
-    edge_output_size=example_input_data.edges.shape[1],
-    node_output_size=example_input_data.nodes.shape[1],
-    global_output_size=example_input_data.globals.shape[1],
+    num_processing_steps=2,
+    edge_output_size=example_target_data.edges.shape[1],
+    node_output_size=example_target_data.nodes.shape[1],
+    global_output_size=example_target_data.globals.shape[1],
     node_output_fn=create_node_output_label
 )
 
@@ -124,7 +126,7 @@ compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_outputs = tf.function(compute_outputs, experimental_relax_shapes=True)
 
 # Checkpoint stuff
-model_path = "./models/test-12"  # 4 for 7, 5 for 4 align, 8 for multi-object, 9 for multi-node-5, 11 for fully connected att graph
+model_path = "./models/has-moved-2"
 checkpoint_root = model_path + "/checkpoints"
 checkpoint_name = "checkpoint-1"
 checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
@@ -146,6 +148,9 @@ else:
 train_steps_per_validation = 100
 validation_batch_size = 512  # valid_generator.num_samples
 
+
+accuracy = tf.keras.metrics.Accuracy()
+
 batch_size = 32
 log_every_seconds = 1
 min_loss = 100.0
@@ -159,6 +164,10 @@ for iteration in range(0, 2000):
     # Calculate validation loss
     (inputs_val, targets_val) = valid_generator.next_batch(validation_batch_size)
     outputs_val, loss_val, acc_val = compiled_compute_outputs(inputs_val, targets_val)
+
+    accuracy.update_state(tf.argmax(targets_val.nodes, axis=1), tf.argmax(outputs_val[-1].nodes, axis=1))
+    acc_val = accuracy.result().numpy()
+
     loss_val_np = loss_val.numpy()
     if loss_val_np < min_loss:
         checkpoint.save(checkpoint_save_prefix)
@@ -169,4 +178,4 @@ for iteration in range(0, 2000):
                   loss_tr.numpy(),
                   loss_val_np,
                   min_loss,
-                  acc_tr.numpy()))
+                  acc_val))

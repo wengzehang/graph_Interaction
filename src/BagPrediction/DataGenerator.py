@@ -144,9 +144,10 @@ class DataGeneratorHasMoved(DataGeneratorBase):
         positions_current = info_all[:, :3]
         positions_next = info_all_next[:, :3]
         positions_diff = np.linalg.norm(positions_next - positions_current, axis=-1).reshape(-1, 1)
-        has_moved = (positions_diff > self.movement_threshold).astype(np.float32)
-        # The has_moved label is -1.0 if the node did not move and 1.0 if it moved
-        has_moved_label = 2.0 * has_moved - 1.0
+        has_moved = positions_diff > self.movement_threshold
+        has_not_moved = positions_diff <= self.movement_threshold
+        # The has_moved label is [1.0, 0.0] if the node did not move and [0.0, 1.0] if it moved
+        has_moved_label = np.hstack((has_not_moved, has_moved)).astype(np.float32)
 
         # Subtract the current effector position from all node positions
         info_all[:, :3] -= effector_xyzr_current[:3]
