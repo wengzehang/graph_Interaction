@@ -1,0 +1,172 @@
+"""
+Graph network module
+"""
+
+import tensorflow as tf
+import sonnet as snt
+import os
+
+from graph_nets import utils_tf
+
+import SimulatedData
+import GraphNetworkModules
+import DataGenerator
+
+train_path_to_topodict = 'h5data/topo_train.pkl'
+train_path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
+
+valid_path_to_topodict = 'h5data/topo_valid.pkl'
+valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
+
+movement_threshold = 0.001
+
+train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
+train_generator = DataGenerator.DataGeneratorHasMoved(train_data, movement_threshold=movement_threshold)
+
+valid_data = SimulatedData.SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
+valid_generator = DataGenerator.DataGeneratorHasMoved(valid_data, movement_threshold=movement_threshold)
+
+
+def make_mlp(layers):
+    return snt.Sequential([
+        snt.nets.MLP(layers, activate_final=True),
+        snt.LayerNorm(axis=-1, create_offset=True, create_scale=True)
+    ])
+
+
+def snt_mlp(layers):
+    return lambda: make_mlp(layers)
+
+
+def create_squared_error(target, output):
+    return tf.reduce_sum((output - target) ** 2,
+                         axis=-1)
+
+
+def create_loss_op(target_op, output_op):
+    # Average mean squared error over node (only a single attribte)
+    errors = create_squared_error(target_op.nodes, output_op.nodes)
+    loss = tf.reduce_mean(errors)
+    return loss
+
+
+def create_accuracy_op(target_op, output_op):
+    target_labels = target_op.nodes
+    output_labels = tf.math.sign(output_op.nodes)
+
+    equal_labels = tf.equal(target_labels, output_labels)
+
+    count = tf.math.count_nonzero(equal_labels, dtype=tf.dtypes.float32)
+    total = tf.shape(target_labels)[0]
+
+    return tf.cast(count, tf.float32) / tf.cast(total, tf.float32)
+
+
+def create_node_output_label():
+    return snt.nets.MLP([1],
+                        activation=tf.nn.tanh,
+                        activate_final=True,
+                        name="node_output")
+
+
+# Optimizer.
+learning_rate = 1e-3
+optimizer = snt.optimizers.Adam(learning_rate)
+
+# Get some example data that resembles the tensors that will be fed
+# into update_step():
+example_input_data, example_target_data = train_generator.next_batch(32)
+
+# Create the graph network.
+module = GraphNetworkModules.EncodeProcessDecode(
+    make_encoder_edge_model=snt_mlp([64, 64]),
+    make_encoder_node_model=snt_mlp([64, 64]),
+    make_encoder_global_model=snt_mlp([64]),
+    make_core_edge_model=snt_mlp([64, 64]),
+    make_core_node_model=snt_mlp([64, 64]),
+    make_core_global_model=snt_mlp([64]),
+    num_processing_steps=5,
+    edge_output_size=example_input_data.edges.shape[1],
+    node_output_size=example_input_data.nodes.shape[1],
+    global_output_size=example_input_data.globals.shape[1],
+    node_output_fn=create_node_output_label
+)
+
+
+def compute_outputs(inputs_tr, targets_tr):
+    outputs_tr = module(inputs_tr)
+    # loss_tr = create_loss(targets_tr, outputs_tr)
+    loss_tr = create_loss_op(targets_tr, outputs_tr[-1])
+    loss_tr = tf.math.reduce_sum(loss_tr) / module.num_processing_steps
+
+    acc_tr = create_accuracy_op(targets_tr, outputs_tr[-1])
+    return outputs_tr, loss_tr, acc_tr
+
+
+def update_step(inputs_tr, targets_tr):
+    with tf.GradientTape() as tape:
+        outputs_tr, loss_tr, acc_tr = compute_outputs(inputs_tr, targets_tr)
+
+    gradients = tape.gradient(loss_tr, module.trainable_variables)
+    optimizer.apply(gradients, module.trainable_variables)
+
+    return outputs_tr, loss_tr, acc_tr
+
+
+# Get the input signature for that function by obtaining the specs
+input_signature = [
+    utils_tf.specs_from_graphs_tuple(example_input_data),
+    utils_tf.specs_from_graphs_tuple(example_target_data)
+]
+
+# Compile the update function using the input signature for speedy code.
+compiled_update_step = tf.function(update_step, input_signature=input_signature)
+compiled_compute_outputs = tf.function(compute_outputs, experimental_relax_shapes=True)
+
+# Checkpoint stuff
+model_path = "./models/test-12"  # 4 for 7, 5 for 4 align, 8 for multi-object, 9 for multi-node-5, 11 for fully connected att graph
+checkpoint_root = model_path + "/checkpoints"
+checkpoint_name = "checkpoint-1"
+checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
+
+# Make sure the model path exists
+if not os.path.exists(model_path):
+    os.makedirs(model_path)
+
+checkpoint = tf.train.Checkpoint(module=module)
+#latest = checkpoint_root + "/checkpoint-1-432"
+latest = tf.train.latest_checkpoint(checkpoint_root)
+if latest is not None:
+    print("Loading latest checkpoint: ", latest)
+    checkpoint.restore(latest)
+else:
+    print("No checkpoint found. Beginning training from scratch.")
+
+# How many training steps before we do a validation run (+ checkpoint)
+train_steps_per_validation = 100
+validation_batch_size = 512  # valid_generator.num_samples
+
+batch_size = 32
+log_every_seconds = 1
+min_loss = 100.0
+for iteration in range(0, 2000):
+    last_iteration = iteration
+
+    for i in range(train_steps_per_validation):
+        (inputs_tr, targets_tr) = train_generator.next_batch(batch_size)
+        outputs_tr, loss_tr, acc_tr = compiled_update_step(inputs_tr, targets_tr)
+
+    # Calculate validation loss
+    (inputs_val, targets_val) = valid_generator.next_batch(validation_batch_size)
+    outputs_val, loss_val, acc_val = compiled_compute_outputs(inputs_val, targets_val)
+    loss_val_np = loss_val.numpy()
+    if loss_val_np < min_loss:
+        checkpoint.save(checkpoint_save_prefix)
+        min_loss = loss_val_np
+
+    print("# {:05d}, Loss Train {:.4f}, Valid {:.4f}, Min {:.4f}; Acc {:.4f}"
+          .format(iteration,
+                  loss_tr.numpy(),
+                  loss_val_np,
+                  min_loss,
+                  acc_tr.numpy()))

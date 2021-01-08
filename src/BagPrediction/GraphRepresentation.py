@@ -128,6 +128,7 @@ class GraphRepresentation:
             "receivers": self.keypoint_edges_to,
         }
 
+
 class GraphRepresentation_rigid_deformable:
     """
     Converts frames of simulated data into graph_dicts which are compatible with TensorFlow and Graph Nets

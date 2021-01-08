@@ -37,6 +37,7 @@ class EncodeProcessDecode(snt.Module):
                  edge_output_size=None,
                  node_output_size=None,
                  global_output_size=None,
+                 node_output_fn=None,
                  name="EncodeProcessDecode"):
         super(EncodeProcessDecode, self).__init__(name=name)
         self._encoder = modules.GraphIndependent(
@@ -57,10 +58,13 @@ class EncodeProcessDecode(snt.Module):
             edge_fn = None
         else:
             edge_fn = lambda: snt.Linear(edge_output_size, name="edge_output")
-        if node_output_size is None:
-            node_fn = None
+        if node_output_fn is None:
+            if node_output_size is None:
+                node_fn = None
+            else:
+                node_fn = lambda: snt.Linear(node_output_size, name="node_output")
         else:
-            node_fn = lambda: snt.Linear(node_output_size, name="node_output")
+            node_fn = node_output_fn
         if global_output_size is None:
             global_fn = None
         else:
