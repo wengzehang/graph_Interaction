@@ -149,7 +149,8 @@ train_steps_per_validation = 100
 validation_batch_size = 512  # valid_generator.num_samples
 
 
-accuracy = tf.keras.metrics.Accuracy()
+train_accuracy = tf.keras.metrics.Accuracy()
+valid_accuracy = tf.keras.metrics.Accuracy()
 
 batch_size = 32
 log_every_seconds = 1
@@ -161,21 +162,31 @@ for iteration in range(0, 2000):
         (inputs_tr, targets_tr) = train_generator.next_batch(batch_size)
         outputs_tr, loss_tr, acc_tr = compiled_update_step(inputs_tr, targets_tr)
 
+        train_accuracy.update_state(tf.argmax(targets_tr.nodes, axis=1),
+                                    tf.argmax(outputs_tr[-1].nodes, axis=1))
+
     # Calculate validation loss
     (inputs_val, targets_val) = valid_generator.next_batch(validation_batch_size)
     outputs_val, loss_val, acc_val = compiled_compute_outputs(inputs_val, targets_val)
 
-    accuracy.update_state(tf.argmax(targets_val.nodes, axis=1), tf.argmax(outputs_val[-1].nodes, axis=1))
-    acc_val = accuracy.result().numpy()
+    valid_accuracy.update_state(tf.argmax(targets_val.nodes, axis=1), tf.argmax(outputs_val[-1].nodes, axis=1))
+    acc_tr = train_accuracy.result().numpy()
+    acc_val = valid_accuracy.result().numpy()
 
     loss_val_np = loss_val.numpy()
     if loss_val_np < min_loss:
         checkpoint.save(checkpoint_save_prefix)
         min_loss = loss_val_np
 
-    print("# {:05d}, Loss Train {:.4f}, Valid {:.4f}, Min {:.4f}; Acc {:.4f}"
+    if train_generator.has_reshuffled:
+        train_accuracy.reset_states()
+    if valid_generator.has_reshuffled:
+        valid_accuracy.reset_states()
+
+    print("# {:05d}, Train Loss {:.4f}, Acc {:.4f}; Valid Loss {:.4f}, Min {:.4f}, Acc {:.4f}"
           .format(iteration,
                   loss_tr.numpy(),
+                  acc_tr,
                   loss_val_np,
                   min_loss,
                   acc_val))
