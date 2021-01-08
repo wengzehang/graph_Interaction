@@ -113,7 +113,7 @@ input_signature = [
 
 # Compile the update function using the input signature for speedy code.
 compiled_update_step = tf.function(update_step, input_signature=input_signature)
-compiled_compute_output_and_loss = tf.function(compute_output_and_loss)
+compiled_compute_output_and_loss = tf.function(compute_output_and_loss, experimental_relax_shapes=True)
 
 # Checkpoint stuff
 model_path = "./models/test-11" # 4 for 7, 5 for 4 align, 8 for multi-object, 9 for multi-node-5, 11 for fully connected att graph
@@ -135,10 +135,11 @@ else:
 
 # How many training steps before we do a validation run (+ checkpoint)
 train_steps_per_validation = 100
-validation_batch_size = 32# valid_generator.num_samples
+validation_batch_size = 512# valid_generator.num_samples
 
 batch_size = 32
 log_every_seconds = 1
+min_loss = 100.0
 for iteration in range(0, 2000):
     last_iteration = iteration
 
@@ -149,7 +150,12 @@ for iteration in range(0, 2000):
     # Calculate validation loss
     (inputs_val, targets_val) = valid_generator.next_batch(validation_batch_size)
     outputs_val, loss_val = compiled_compute_output_and_loss(inputs_val, targets_val)
+    loss_val_np = loss_val.numpy()
+    if loss_val_np < min_loss:
+        checkpoint.save(checkpoint_save_prefix)
+        min_loss = loss_val_np
 
-    checkpoint.save(checkpoint_save_prefix)
-
-    print("# {:05d}, Loss Train {:.4f}, Loss Valid {:.4f}".format(iteration, loss_tr.numpy(), loss_val.numpy()))
+    print("# {:05d}, Loss Train {:.4f}, Valid {:.4f}, Min {:.4f}".format(iteration,
+                                                                         loss_tr.numpy(),
+                                                                         loss_val_np,
+                                                                         min_loss))
