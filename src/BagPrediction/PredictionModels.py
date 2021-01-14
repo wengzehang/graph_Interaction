@@ -49,13 +49,11 @@ class FullyConnectedPredictionModel(PredictionInterface):
         )
 
     def predict_frame(self, frame: SimulatedData.Frame, next_effector_position: np.array) -> PredictedFrame:
-        print("Predicting frame", frame.scenario_index, "/", frame.frame_index)
-
         # Prepare input graph tuples
         current_effector_position = frame.get_effector_pose()[0][:3]
         input_graph_dict = self.representation.to_graph_dict_global_4_align(frame, next_effector_position,
                                                                             current_effector_position, add_noise=False)
-        input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([input_graph_dict] * 32)
+        input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([input_graph_dict])
 
         # Model prediction
         predicted_graph_tuples = self.model(input_graph_tuples)
