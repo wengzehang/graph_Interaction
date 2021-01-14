@@ -54,9 +54,33 @@ class Frame:
         # mesh_vertices = np.hstack((mesh_vertices, keypoint_radius, keypoint_undercontrol))
         return mesh_vertices
 
+    def get_cloth_keypoint_info_partgraph(self, indices, fix_indices):
+        mesh_frame = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
+        mesh_vertices = mesh_frame[indices]
+        num_keypoints = mesh_vertices.shape[0]
+        keypoint_radius = np.ones((num_keypoints, 1)) * 1e-5
+
+
+        inversedense = np.ones((mesh_frame.shape[0],1))
+        inversedense[fix_indices] = 0.0
+        inversedense = inversedense[indices]
+
+        mesh_vertices = np.hstack((mesh_vertices, keypoint_radius, inversedense))
+
+        # calculate the mass center of the particles
+        # use it as a node
+        deformnode = mesh_vertices.mean(axis=0)
+        rad = ((deformnode[:3] - mesh_vertices[:, :3]) ** 2).sum(axis=1).max() / 2
+        deformnode[3] = rad
+        deformnode[4] = 1.0 # free, nonfix point
+        deformnode = deformnode.reshape(1,5)
+
+        mesh_vertices = np.vstack((mesh_vertices, deformnode))
+        return mesh_vertices
+
     def get_rigid_keypoint_info(self):
         rigid_vertices = self.data.dataset[RIGID_KEY][self.scenario_index][self.frame_index][:self.num_rigid,:]
-        inversedense = np.ones((rigid_vertices.shape[0],1))
+        inversedense = np.ones((rigid_vertices.shape[0],1)) #  * 100
         rigid_vertices = np.hstack((rigid_vertices, inversedense))
         return rigid_vertices
 

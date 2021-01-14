@@ -13,7 +13,7 @@ import GraphRepresentation
 
 
 class DataGenerator:
-    def __init__(self, data: SimulatedData.SimulatedData):
+    def __init__(self, data: SimulatedData.SimulatedData, edgetype=None):
         self.data = data
 
         # We can generate a sample from each adjacent frame pair
@@ -29,6 +29,7 @@ class DataGenerator:
 
         self.generated_count = 0
         self.has_reshuffled = False
+        self.edgetype = edgetype
 
     def next_batch(self, batch_size: int) -> Tuple:
         dataset_size = self.num_samples
@@ -53,7 +54,8 @@ class DataGenerator:
             current_frame = scenario.frame(frame_index)
             next_frame = scenario.frame(frame_index + 1)
 
-            input_dicts[i], target_dicts[i] = self.create_input_and_target_graph_dict(current_frame, next_frame)
+            # input_dicts[i], target_dicts[i] = self.create_input_and_target_graph_dict(current_frame, next_frame)
+            input_dicts[i], target_dicts[i] = self.create_input_and_target_graph_dict(current_frame, next_frame, edgetype=self.edgetype)
 
         input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple(input_dicts)
         target_graph_tuples = utils_tf.data_dicts_to_graphs_tuple(target_dicts)
@@ -61,7 +63,7 @@ class DataGenerator:
 
     def create_input_and_target_graph_dict(self,
                                            current_frame: SimulatedData.Frame,
-                                           next_frame: SimulatedData.Frame):
+                                           next_frame: SimulatedData.Frame, edgetype=None):
 
         # This method should be overridden by derived classes to define different attribute structures
         # TODO: Do we need access to the previous frame?
@@ -73,16 +75,33 @@ class DataGenerator:
         current_frame_effector = current_frame.get_effector_pose().reshape(4)
         next_frame_effector = next_frame.get_effector_pose().reshape(4)
 
-        # try:
         potential_future_frame_effector = next_frame_effector*2 - current_frame_effector # be careful about the radius
-        # except RuntimeWarning:
-        #     import pdb;
-        #     pdb.set_trace()
 
         potential_future_frame_effector[3] = next_frame_effector[3]
-        # current_graph = self.representation.to_graph_dict_global_7(current_frame, next_frame_effector)
-        # next_graph = self.representation.to_graph_dict_global_7(next_frame, potential_future_frame_effector)
-        current_graph = self.representation.to_graph_dict_global_4_align(current_frame, next_frame_effector, current_frame_effector[:3])
-        next_graph = self.representation.to_graph_dict_global_4_align(next_frame, potential_future_frame_effector, current_frame_effector[:3])
+
+        if edgetype == None:
+            # xxx: fully connected graph
+            current_graph = self.representation.to_graph_dict_global_4_align(current_frame, next_frame_effector,
+                                                                                     current_frame_effector[:3])
+            next_graph = self.representation.to_graph_dict_global_4_align(next_frame,
+                                                                              potential_future_frame_effector,
+                                                                              current_frame_effector[:3])
+        elif edgetype == 1:
+            # xxx: partially connected graph
+            current_graph = self.representation.to_graph_dict_global_align_type1(current_frame, next_frame_effector,
+                                                                                     current_frame_effector[:3])
+            next_graph = self.representation.to_graph_dict_global_align_type1(next_frame,
+                                                                                  potential_future_frame_effector,
+                                                                                  current_frame_effector[:3])
+        elif edgetype == 2:
+            # xxx: fully connected graph but with copied edge attribute
+            current_graph = self.representation.to_graph_dict_global_align_type2(current_frame, next_frame_effector,
+                                                                                 current_frame_effector[:3])
+            next_graph = self.representation.to_graph_dict_global_align_type2(next_frame,
+                                                                              potential_future_frame_effector,
+                                                                              current_frame_effector[:3])
+        else:
+            raise Exception("Please choose a correct edgetype flag")
+
         return current_graph, next_graph
 

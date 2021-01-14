@@ -14,17 +14,32 @@ import GraphRepresentation
 import GraphNetworkModules
 import DataGenerator
 
+
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+  try:
+    tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=2048)])
+  except RuntimeError as e:
+    print(e)
+
+
 train_path_to_topodict = 'h5data/topo_train.pkl'
+# train_path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1.h5'
 train_path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
 
 valid_path_to_topodict = 'h5data/topo_valid.pkl'
+# valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1.h5'
 valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
 
+# xxx: None for normal fully graph; 1 for partially connected graph; 2 for fully connected graph but with copied edge attribute
+#  Remember to modified the edge attr size for the network
+graph_edgetype = 1
+
 train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
-train_generator = DataGenerator.DataGenerator(train_data)
+train_generator = DataGenerator.DataGenerator(train_data, graph_edgetype)
 
 valid_data = SimulatedData.SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
-valid_generator = DataGenerator.DataGenerator(valid_data)
+valid_generator = DataGenerator.DataGenerator(valid_data, graph_edgetype)
 
 representation = GraphRepresentation.GraphRepresentation(SimulatedData.keypoint_indices, SimulatedData.keypoint_edges)
 
@@ -40,28 +55,27 @@ def snt_mlp(layers):
     return lambda: make_mlp(layers)
 
 
-def create_loss(target, outputs, input):
-    losses = [
-        # FIXME: Add an additional mse loss for comparing the global features
-        # tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
-        # tf.compat.v1.losses.mean_squared_error(target.edges, output.edges)
-
-        # tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
-        # tf.compat.v1.losses.mean_squared_error(target.edges, output.edges) +
-        # tf.compat.v1.losses.mean_squared_error(target.globals, output.globals)
-
-        # tf.compat.v1.losses.mean_squared_error(target.nodes, output.nodes) +
-
-        # tf.compat.v1.losses.mean_squared_error(target.nodes[:,:3], output.nodes[:,:3]) +
-        # tf.compat.v1.losses.mean_squared_error(target.edges[:,:3], output.edges[:,:3]) +
-        # tf.compat.v1.losses.mean_squared_error(target.globals, input.globals)
-
-        # TODO: LOSS CHANGE
-        tf.compat.v1.losses.mean_squared_error(target.nodes[:,:3], output.nodes[:,:3]) +
-        tf.compat.v1.losses.mean_squared_error(target.edges[:,:3], output.edges[:,:3])
-
+def create_loss(target, outputs, edgetype=None):
+    losses = None
+    if edgetype == None:
+        losses = [
+            tf.compat.v1.losses.mean_squared_error(target.nodes[:, :3], output.nodes[:, :3]) +
+            tf.compat.v1.losses.mean_squared_error(target.edges[:, :3], output.edges[:, :3])
+            for output in outputs
+        ]
+    elif edgetype == 1:
+        losses = [
+            tf.compat.v1.losses.mean_squared_error(target.nodes[:, :3], output.nodes[:, :3]) +
+            tf.compat.v1.losses.mean_squared_error(target.edges[:, :3], output.edges[:, :3])
+            for output in outputs
+        ]
+    elif edgetype == 2:
+        losses = [
+            tf.compat.v1.losses.mean_squared_error(target.nodes[:,:3], output.nodes[:,:3]) +
+            tf.compat.v1.losses.mean_squared_error(target.edges[:,:6], output.edges[:,:6])
         for output in outputs
-    ]
+        ]
+
     return tf.stack(losses)
 
 
@@ -78,8 +92,8 @@ module = GraphNetworkModules.EncodeProcessDecode(
     make_core_node_model=snt_mlp([64, 64]),
     make_core_global_model=snt_mlp([64]),
     num_processing_steps=5,
-    edge_output_size=4, # 3
-    node_output_size=5, # 3
+    edge_output_size= 4, # TODO: Modify the edge number for different edge types
+    node_output_size= 5, # 5, # 5, 3
     global_output_size=4, # TODO: Modify the length of global feature vector
 )
 
@@ -87,7 +101,7 @@ module = GraphNetworkModules.EncodeProcessDecode(
 def compute_output_and_loss(inputs_tr, targets_tr):
     outputs_tr = module(inputs_tr)
     # loss_tr = create_loss(targets_tr, outputs_tr)
-    loss_tr = create_loss(targets_tr, outputs_tr, inputs_tr)
+    loss_tr = create_loss(targets_tr, outputs_tr)
     loss_tr = tf.math.reduce_sum(loss_tr) / module.num_processing_steps
     return outputs_tr, loss_tr
 
@@ -116,8 +130,7 @@ input_signature = [
 compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_output_and_loss = tf.function(compute_output_and_loss)
 
-# Checkpoint stuff
-model_path = "./models/test-11" # 4 for 7, 5 for 4 align, 8 for multi-object, 9 for multi-node-5, 11 for fully connected att graph
+model_path = "./models/test-10"
 checkpoint_root = model_path + "/checkpoints"
 checkpoint_name = "checkpoint-1"
 checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)

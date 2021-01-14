@@ -303,6 +303,7 @@ if __name__ == '__main__':
     checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
     checkpoint = tf.train.Checkpoint(module=module)
     latest = tf.train.latest_checkpoint(checkpoint_root)
+    # latest = tf.train.load_checkpoint("/home/zehang/Downloads/project/graph_Interaction/src/BagPrediction/models/test-6/checkpoints/checkpoint-1-18")
     checkpoint.restore(latest)
 
     #
@@ -360,7 +361,10 @@ if __name__ == '__main__':
                 # FIXME: Use the last processed graph output info to construct the next input, I re-calculate the edge attributes, and use the ground-truth effector position
 
                 # replace the node position for rendering
+
                 current_node_recover = current_predict_tuples[-1].nodes.numpy() + gt_prev_effector_pose[:3]
+                current_node_recover[SimulatedData.fix_keypoint_place,:3] = prev_graph_dict['nodes'][SimulatedData.fix_keypoint_place,:3]+ gt_prev_effector_pose[:3]
+
                 data_vis.dataset_cloth[i_scenario][i_frame][
                         representation.keypoint_indices] = current_node_recover
 
@@ -380,7 +384,8 @@ if __name__ == '__main__':
                 new_global[:3] -= gt_current_effector_pose[:3]
                 # positions = current_predict_tuples[-1].nodes.numpy() - gt_current_effector_pose[:3]
 
-                current_graph_dict ={
+                # current_graph_dict ={
+                prev_graph_dict ={
                     "globals": new_global,  # TODO: Fill global field with action parameter
                     "nodes": current_node_align, # current_predict_tuples[-1].nodes.numpy(),
                     "edges": newedge,
@@ -393,7 +398,8 @@ if __name__ == '__main__':
                 #         representation.keypoint_indices] = current_node_recover# current_predict_tuples[-1].nodes
 
                 # Update the next round input
-                prev_input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([current_graph_dict])
+                # prev_input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([current_graph_dict])
+                prev_input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([prev_graph_dict])
 
 
     data_vis.run()
