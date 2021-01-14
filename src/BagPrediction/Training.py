@@ -5,6 +5,7 @@ Graph network module
 import tensorflow as tf
 import sonnet as snt
 import os
+import pickle
 
 from graph_nets import utils_tf
 
@@ -95,14 +96,17 @@ module = GraphNetworkModules.EncodeProcessDecode(
 )
 
 
+def predict(inputs_tr):
+    return module(inputs_tr)
+
+
 def compute_outputs(inputs_tr, targets_tr):
     outputs_tr = module(inputs_tr)
     # loss_tr = create_loss(targets_tr, outputs_tr)
     loss_tr = create_loss_op(targets_tr, outputs_tr[-1])
     loss_tr = tf.math.reduce_sum(loss_tr) / module.num_processing_steps
 
-    acc_tr = create_accuracy_op(targets_tr, outputs_tr[-1])
-    return outputs_tr, loss_tr, acc_tr
+    return outputs_tr, loss_tr
 
 
 def update_step(inputs_tr, targets_tr):
@@ -121,12 +125,18 @@ input_signature = [
     utils_tf.specs_from_graphs_tuple(example_target_data)
 ]
 
+input_signature_predict = [
+    utils_tf.specs_from_graphs_tuple(example_input_data)
+]
+
 # Compile the update function using the input signature for speedy code.
 compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_outputs = tf.function(compute_outputs, experimental_relax_shapes=True)
+compiled_predict = tf.function(predict, experimental_relax_shapes=True)
 
 # Checkpoint stuff
-model_path = "./models/has-moved-2"
+model_path = "./models/test-11"
+#model_path = "./models/has-moved-2"
 checkpoint_root = model_path + "/checkpoints"
 checkpoint_name = "checkpoint-1"
 checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
@@ -136,8 +146,8 @@ if not os.path.exists(model_path):
     os.makedirs(model_path)
 
 checkpoint = tf.train.Checkpoint(module=module)
-#latest = checkpoint_root + "/checkpoint-1-432"
-latest = tf.train.latest_checkpoint(checkpoint_root)
+latest = checkpoint_root + "/checkpoint-1-432"
+#latest = tf.train.latest_checkpoint(checkpoint_root)
 if latest is not None:
     print("Loading latest checkpoint: ", latest)
     checkpoint.restore(latest)
@@ -146,28 +156,46 @@ else:
 
 # How many training steps before we do a validation run (+ checkpoint)
 train_steps_per_validation = 100
+batch_size = 32
 validation_batch_size = 512  # valid_generator.num_samples
 
+# save_complete_model = True
+# if save_complete_model:
+#     print("Trying to save model, running one validation step first")
+#     (inputs_tr, targets_tr) = train_generator.next_batch(batch_size)
+#     outputs_tr = compiled_predict(inputs_tr)
+#     (inputs_val, targets_val) = valid_generator.next_batch(validation_batch_size)
+#     outputs_val = compiled_predict(inputs_val)
+#
+#     #to_save = snt.Module()
+#     #to_save.predict = compiled_predict
+#     #to_save.all_variables = list(module.variables)
+#
+#     print("Now, saving the model")
+#     complete_model_path = model_path + "/pickle_model"
+#     #tf.saved_model.save(to_save, complete_model_path)
+#     with open(complete_model_path, 'wb') as file:
+#         pickle.dump(module, file)
+#     print("Saved model to", complete_model_path)
+#     raise NotImplementedError()
 
 train_accuracy = tf.keras.metrics.Accuracy()
 valid_accuracy = tf.keras.metrics.Accuracy()
 
-batch_size = 32
-log_every_seconds = 1
 min_loss = 100.0
 for iteration in range(0, 2000):
     last_iteration = iteration
 
     for i in range(train_steps_per_validation):
         (inputs_tr, targets_tr) = train_generator.next_batch(batch_size)
-        outputs_tr, loss_tr, acc_tr = compiled_update_step(inputs_tr, targets_tr)
+        outputs_tr, loss_tr = compiled_update_step(inputs_tr, targets_tr)
 
         train_accuracy.update_state(tf.argmax(targets_tr.nodes, axis=1),
                                     tf.argmax(outputs_tr[-1].nodes, axis=1))
 
     # Calculate validation loss
     (inputs_val, targets_val) = valid_generator.next_batch(validation_batch_size)
-    outputs_val, loss_val, acc_val = compiled_compute_outputs(inputs_val, targets_val)
+    outputs_val, loss_val = compiled_compute_outputs(inputs_val, targets_val)
 
     valid_accuracy.update_state(tf.argmax(targets_val.nodes, axis=1), tf.argmax(outputs_val[-1].nodes, axis=1))
     acc_tr = train_accuracy.result().numpy()
