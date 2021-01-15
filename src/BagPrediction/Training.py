@@ -111,12 +111,12 @@ def compute_outputs(inputs_tr, targets_tr):
 
 def update_step(inputs_tr, targets_tr):
     with tf.GradientTape() as tape:
-        outputs_tr, loss_tr, acc_tr = compute_outputs(inputs_tr, targets_tr)
+        outputs_tr, loss_tr = compute_outputs(inputs_tr, targets_tr)
 
     gradients = tape.gradient(loss_tr, module.trainable_variables)
     optimizer.apply(gradients, module.trainable_variables)
 
-    return outputs_tr, loss_tr, acc_tr
+    return outputs_tr, loss_tr
 
 
 # Get the input signature for that function by obtaining the specs
