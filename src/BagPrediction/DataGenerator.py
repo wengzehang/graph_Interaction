@@ -14,7 +14,7 @@ import GraphRepresentation
 
 
 class DataGeneratorBase:
-    def __init__(self, data: SimulatedData.SimulatedData, edgetype=None):
+    def __init__(self, data: SimulatedData.SimulatedData):
         self.data = data
 
         # We can generate a sample from each adjacent frame pair
@@ -29,7 +29,6 @@ class DataGeneratorBase:
 
         self.generated_count = 0
         self.has_reshuffled = False
-        self.edgetype = edgetype
 
     def next_batch(self, batch_size: int) -> Tuple:
         dataset_size = self.num_samples
@@ -63,8 +62,9 @@ class DataGeneratorBase:
 
 
 class DataGenerator(DataGeneratorBase):
-    def __init__(self, data: SimulatedData.SimulatedData):
-        super().__init__(self, data)
+    def __init__(self, data: SimulatedData.SimulatedData, edgetype=None):
+        super().__init__(data)
+        self.edgetype = edgetype
 
     def create_input_and_target_graph_dict(self,
                                            current_frame: SimulatedData.Frame,
