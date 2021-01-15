@@ -31,10 +31,14 @@ class Frame:
         self.scenario_index = scenario_index
         self.frame_index = frame_index
         self.num_rigid = self.data.dataset[RIGID_NUM_KEY][self.scenario_index]
+        self.overwritten_keypoint_pos = None
 
     def get_cloth_keypoint_positions(self, indices):
         mesh_vertices = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
         return mesh_vertices[indices]
+
+    def overwrite_keypoint_positions(self, keypoint_positions: np.array):
+        self.overwritten_keypoint_pos = keypoint_positions
 
     def get_cloth_keypoint_info(self, indices, fix_indices):
         mesh_frame = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
@@ -42,6 +46,9 @@ class Frame:
         num_keypoints = mesh_vertices.shape[0]
         keypoint_radius = np.ones((num_keypoints, 1)) * 1e-5
 
+        # Replace keypoint positions if they have been overwritten
+        if self.overwritten_keypoint_pos is not None:
+            mesh_vertices = self.overwritten_keypoint_pos
 
         inversedense = np.ones((mesh_frame.shape[0],1))
         inversedense[fix_indices] = 0.0
