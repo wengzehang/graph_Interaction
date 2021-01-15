@@ -6,6 +6,8 @@ from PredictionInterface import PredictionInterface, PredictedFrame
 from PredictionModels import FullyConnectedPredictionModel
 from SimulatedData import SimulatedData, Scenario, Frame, keypoint_indices
 
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -112,3 +114,5 @@ if __name__ == '__main__':
 
     print("Frame-wise errors:")
     print(result.horizon_pos_error_mean)
+
+    plt.bar(range(result.horizon_pos_error_mean.shape[0]), result.horizon_pos_error_mean)
