@@ -25,9 +25,16 @@ class Evaluation:
 
     def evaluate_dataset(self, data: SimulatedData) -> EvaluationResult:
 
-        errors = np.zeros(data.num_scenarios * (data.num_frames - 1))
+        keypoint_pos_error_mean, keypoint_pos_error_stddev = self.calculate_keypoint_pos_mean_error(data)
+        #horizon_pos_error_mean = self.calculate_horizon_pos_error(data)
+
+        return EvaluationResult(keypoint_pos_error_mean, keypoint_pos_error_stddev)
+
+    def calculate_keypoint_pos_mean_error(self, data: SimulatedData):
+        num_scenarios = min(data.num_scenarios, self.max_scenario_index)
+        errors = np.zeros(num_scenarios * (data.num_frames - 1))
         error_index = 0
-        for scenario_index in range(min(data.num_scenarios, self.max_scenario_index)):
+        for scenario_index in range(num_scenarios):
             print("Scenario", scenario_index)
             scenario = data.scenario(scenario_index)
             next_frame = scenario.frame(0)
@@ -42,23 +49,50 @@ class Evaluation:
 
                 error_index += 1
 
-        keypoint_pos_error_mean = np.mean(errors)
-        keypoint_pos_error_stddev = np.std(errors)
-        return EvaluationResult(keypoint_pos_error_mean, keypoint_pos_error_stddev)
+        return np.mean(errors), np.std(errors)
+
+    def calculate_horizon_pos_error(self, data: SimulatedData):
+        errors_per_step = [None] * (data.num_frames - 1)
+        error_index = 0
+        for scenario_index in range(min(data.num_scenarios, self.max_scenario_index)):
+            print("Scenario", scenario_index)
+            scenario = data.scenario(scenario_index)
+
+            current_frame = scenario.frame(0)
+            next_frame = scenario.frame(1)
+
+            next_effector_position = next_frame.get_effector_pose()[0]
+            prev_predicted_frame = self.model.predict_frame(current_frame, next_effector_position)
+            errors_per_step[0] = self.calculate_keypoint_pos_error(prev_predicted_frame, next_frame)
+
+            for frame_index in range(1, data.num_frames - 1):
+                prev_frame = current_frame
+                current_frame = next_frame
+                next_frame = scenario.frame(frame_index + 1)
+
+                # Evaluate single frame
+                next_effector_position = next_frame.get_effector_pose()[0]
+                predicted_frame = self.model.predict_frame(current_frame, next_effector_position)
+                errors_per_step[error_index] = self.calculate_keypoint_pos_error(predicted_frame, next_frame)
+
+                error_index += 1
+
+        return None
 
     def calculate_keypoint_pos_error(self, predicted: PredictedFrame, ground_truth: Frame):
         pred_keypoint_pos = predicted.cloth_keypoint_positions
         gt_keypoint_pos = ground_truth.get_cloth_keypoint_positions(keypoint_indices)
 
-        error = np.linalg.norm(gt_keypoint_pos - pred_keypoint_pos)
-        return error
+        errors = np.linalg.norm(gt_keypoint_pos - pred_keypoint_pos, axis=-1)
+        mean_error = np.mean(errors)
+        return mean_error
 
 
 if __name__ == '__main__':
     model = FullyConnectedPredictionModel()
     eval = Evaluation(model)
 
-    dataset_name = "valid"
+    dataset_name = "train"
     if dataset_name == "train":
         train_path_to_topodict = 'h5data/topo_train.pkl'
         train_path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
