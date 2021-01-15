@@ -128,6 +128,7 @@ class GraphRepresentation:
             "receivers": self.keypoint_edges_to,
         }
 
+
 class GraphRepresentation_rigid_deformable:
     """
     Converts frames of simulated data into graph_dicts which are compatible with TensorFlow and Graph Nets
@@ -344,7 +345,11 @@ class GraphRepresentation_rigid_deformable:
             "receivers": receiver_indices,  # self.keypoint_edges_to,
         }
 
-    def to_graph_dict_global_align_type2(self, frame_current: SimulatedData.Frame, effector_positions_future: np.float32([0.0, 0.0, 0.0]), origin: np.float32([0.0, 0.0, 0.0])) -> Dict[str, List]:
+    def to_graph_dict_global_align_type2(self,
+                                         frame_current: SimulatedData.Frame,
+                                         effector_positions_future: np.float32([0.0, 0.0, 0.0]),
+                                         origin: np.float32([0.0, 0.0, 0.0]),
+                                         add_noise=False) -> Dict[str, List]:
         # Function: Convert the frames into fully connected graphs, which are aligned by the current effector position
         #  nodes (5): [x, y, z, radius, freeflag]
         #  edge (7): [dx, dy, dz, dx', dy', dz', physicalflag=0/1]
@@ -383,7 +388,12 @@ class GraphRepresentation_rigid_deformable:
         # xxx: Construct the edge features
         #  assign physical connection with flag=1
         positions = info_all[:, :3]
+
         edge_index = [i for i in itertools.product(np.arange(self.num_allpoints), repeat=2)]
+        if add_noise:
+            noise = np.random.normal([0.0,0.0,0.0],0.002, positions.shape)
+            positions = positions + noise
+
         # all connected, bidirectional
         self.keypoint_edges_to_ALL, self.keypoint_edges_from_ALL = list(zip(*edge_index))
 

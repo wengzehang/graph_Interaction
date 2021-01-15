@@ -37,6 +37,7 @@ class EncodeProcessDecode(snt.Module):
                  edge_output_size=None,
                  node_output_size=None,
                  global_output_size=None,
+                 node_output_fn=None,
                  name="EncodeProcessDecode"):
         super(EncodeProcessDecode, self).__init__(name=name)
         self._encoder = modules.GraphIndependent(
@@ -57,10 +58,13 @@ class EncodeProcessDecode(snt.Module):
             edge_fn = None
         else:
             edge_fn = lambda: snt.Linear(edge_output_size, name="edge_output")
-        if node_output_size is None:
-            node_fn = None
+        if node_output_fn is None:
+            if node_output_size is None:
+                node_fn = None
+            else:
+                node_fn = lambda: snt.Linear(node_output_size, name="node_output")
         else:
-            node_fn = lambda: snt.Linear(node_output_size, name="node_output")
+            node_fn = node_output_fn
         if global_output_size is None:
             global_fn = None
         else:
@@ -78,3 +82,14 @@ class EncodeProcessDecode(snt.Module):
             decoded_op = self._decoder(latent)
             output_ops.append(self._output_transform(decoded_op))
         return output_ops
+
+
+def make_mlp(layers):
+    return snt.Sequential([
+        snt.nets.MLP(layers, activate_final=True),
+        snt.LayerNorm(axis=-1, create_offset=True, create_scale=True)
+    ])
+
+
+def snt_mlp(layers):
+    return lambda: make_mlp(layers)
