@@ -1,6 +1,7 @@
 from graph_nets import modules
 from graph_nets import utils_tf
 import sonnet as snt
+import tensorflow as tf
 
 
 class EncodeProcessDecode(snt.Module):
@@ -93,3 +94,9 @@ def make_mlp(layers):
 
 def snt_mlp(layers):
     return lambda: make_mlp(layers)
+
+def create_node_output_label():
+    return snt.nets.MLP([2],
+                        activation=tf.nn.softmax,
+                        activate_final=True,
+                        name="node_output")

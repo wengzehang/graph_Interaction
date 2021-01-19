@@ -88,7 +88,7 @@ module = GraphNetworkModules.EncodeProcessDecode(
     make_core_edge_model=snt_mlp([64, 64]),
     make_core_node_model=snt_mlp([64, 64]),
     make_core_global_model=snt_mlp([64]),
-    num_processing_steps=2,
+    num_processing_steps=1,
     edge_output_size=example_target_data.edges.shape[1],
     node_output_size=example_target_data.nodes.shape[1],
     global_output_size=example_target_data.globals.shape[1],
@@ -146,7 +146,8 @@ if not os.path.exists(model_path):
     os.makedirs(model_path)
 
 checkpoint = tf.train.Checkpoint(module=module)
-latest = checkpoint_root + "/checkpoint-1-432"
+# latest = checkpoint_root + "/checkpoint-1-432"
+latest = None
 #latest = tf.train.latest_checkpoint(checkpoint_root)
 if latest is not None:
     print("Loading latest checkpoint: ", latest)

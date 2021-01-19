@@ -100,28 +100,28 @@ class DataGenerator(DataGeneratorBase):
         elif self.edgetype == 2:
             # xxx: fully connected graph but with copied edge attribute
             current_graph = self.representation.to_graph_dict_global_align_type2(current_frame, next_frame_effector,
-                                                                                 current_frame_effector[:3])
+                                                                                 current_frame_effector[:3],add_noise=True)
             next_graph = self.representation.to_graph_dict_global_align_type2(next_frame,
                                                                               potential_future_frame_effector,
                                                                               current_frame_effector[:3])
         else:
             raise Exception("Please choose a correct edgetype flag")
 
-        # try:
-        potential_future_frame_effector = next_frame_effector * 2 - current_frame_effector  # be careful about the radius
-        # except RuntimeWarning:
-        #     import pdb;
-        #     pdb.set_trace()
-
-        potential_future_frame_effector[3] = next_frame_effector[3]
-        # current_graph = self.representation.to_graph_dict_global_7(current_frame, next_frame_effector)
-        # next_graph = self.representation.to_graph_dict_global_7(next_frame, potential_future_frame_effector)
-        current_graph = self.representation.to_graph_dict_global_4_align(current_frame,
-                                                                         next_frame_effector,
-                                                                         current_frame_effector[:3],
-                                                                         add_noise=True)
-        next_graph = self.representation.to_graph_dict_global_4_align(next_frame, potential_future_frame_effector,
-                                                                      current_frame_effector[:3])
+        # # try:
+        # potential_future_frame_effector = next_frame_effector * 2 - current_frame_effector  # be careful about the radius
+        # # except RuntimeWarning:
+        # #     import pdb;
+        # #     pdb.set_trace()
+        #
+        # potential_future_frame_effector[3] = next_frame_effector[3]
+        # # current_graph = self.representation.to_graph_dict_global_7(current_frame, next_frame_effector)
+        # # next_graph = self.representation.to_graph_dict_global_7(next_frame, potential_future_frame_effector)
+        # current_graph = self.representation.to_graph_dict_global_4_align(current_frame,
+        #                                                                  next_frame_effector,
+        #                                                                  current_frame_effector[:3],
+        #                                                                  add_noise=True)
+        # next_graph = self.representation.to_graph_dict_global_4_align(next_frame, potential_future_frame_effector,
+        #                                                               current_frame_effector[:3])
         return current_graph, next_graph
 
 
@@ -199,6 +199,11 @@ class DataGeneratorHasMoved(DataGeneratorBase):
         distances[:, :3] = positions[keypoint_edges_to_ALL] - positions[keypoint_edges_from_ALL]
         combineindices = self.representation.keypoint_edges_to * num_allpoints + self.representation.keypoint_edges_from
         distances[combineindices, 3] = 1  # denote the physical connection
+
+        # xxx: bidirectional
+        combineindices = self.representation.keypoint_edges_from*num_allpoints+self.representation.keypoint_edges_to
+        # distances[combineindices,3] = 1 # denote the physical connection
+        distances[combineindices,3] = 1 # denote the physical connection
 
         input_graph_dict = {
             "globals": global_features,  # TODO: Fill global field with action parameter

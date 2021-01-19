@@ -3,7 +3,7 @@ Evaluation code for prediction models
 """
 
 from PredictionInterface import PredictionInterface, PredictedFrame
-from PredictionModels import FullyConnectedPredictionModel
+from PredictionModels import FullyConnectedPredictionModel, FullyConnectedMaskedPredictionModel
 from SimulatedData import SimulatedData, Scenario, Frame, keypoint_indices
 
 import matplotlib
@@ -96,7 +96,8 @@ class Evaluation:
 
 
 if __name__ == '__main__':
-    model = FullyConnectedPredictionModel()
+    # model = FullyConnectedPredictionModel()
+    model = FullyConnectedMaskedPredictionModel()
     eval = Evaluation(model)
 
     dataset_name = "train"
