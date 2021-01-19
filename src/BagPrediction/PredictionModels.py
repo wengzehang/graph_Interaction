@@ -10,6 +10,7 @@ from PredictionInterface import PredictionInterface, PredictedFrame
 from graph_nets import utils_tf
 import tensorflow as tf
 import numpy as np
+import sonnet as snt
 
 
 class FullyConnectedPredictionModel(PredictionInterface):
@@ -23,7 +24,7 @@ class FullyConnectedPredictionModel(PredictionInterface):
         if checkpoint_to_load is None:
             latest = tf.train.latest_checkpoint(checkpoint_root)
         else:
-            latest = checkpoint_root + "/checkpoint-1-432"
+            latest = checkpoint_root + "/" + checkpoint_to_load
 
         print("Loading checkpoint:", latest)
         checkpoint = tf.train.Checkpoint(module=self.model)
@@ -52,7 +53,7 @@ class FullyConnectedPredictionModel(PredictionInterface):
         # Prepare input graph tuples
         current_effector_position = frame.get_effector_pose()[0][:3]
         input_graph_dict = self.representation.to_graph_dict_global_4_align(frame, next_effector_position,
-                                                                            current_effector_position, add_noise=False)
+                                                                            current_effector_position)
         input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([input_graph_dict])
 
         # Model prediction
@@ -70,6 +71,83 @@ class FullyConnectedPredictionModel(PredictionInterface):
         rigid_body_positions = None
 
         return PredictedFrame(cloth_keypoint_positions, rigid_body_positions)
+
+
+class HasMovedMaskPredictionModel(PredictionInterface):
+    def __init__(self,
+                 motion_model: PredictionInterface,
+                 model_path="./models/has-moved-2",
+                 checkpoint_to_load=None):
+        self.motion_model = motion_model
+
+        self.has_moved_model = self.create_has_moved_model()
+
+        checkpoint_root = model_path + "/checkpoints"
+        if checkpoint_to_load is None:
+            latest = tf.train.latest_checkpoint(checkpoint_root)
+        else:
+            latest = checkpoint_root + "/" + checkpoint_to_load
+
+        print("Loading checkpoint:", latest)
+        checkpoint = tf.train.Checkpoint(module=self.has_moved_model)
+        checkpoint.restore(latest)
+
+        self.representation = GraphRepresentation.GraphRepresentation_rigid_deformable(SimulatedData.keypoint_indices,
+                                                                                       SimulatedData.keypoint_edges)
+
+    @staticmethod
+    def create_node_output_label():
+        return snt.nets.MLP([2],
+                            activation=tf.nn.softmax,
+                            activate_final=True,
+                            name="node_output")
+
+    def create_has_moved_model(self):
+        return EncodeProcessDecode(
+            make_encoder_edge_model=snt_mlp([64, 64]),
+            make_encoder_node_model=snt_mlp([64, 64]),
+            make_encoder_global_model=snt_mlp([64]),
+            make_core_edge_model=snt_mlp([64, 64]),
+            make_core_node_model=snt_mlp([64, 64]),
+            make_core_global_model=snt_mlp([64]),
+            num_processing_steps=2,
+            edge_output_size=4,
+            node_output_size=2,
+            global_output_size=4,
+            node_output_fn=HasMovedMaskPredictionModel.create_node_output_label
+        )
+
+    def predict_frame(self, frame: SimulatedData.Frame, next_effector_position: np.array) -> PredictedFrame:
+
+        # Prepare input graph tuples
+        current_effector_position = frame.get_effector_pose()[0][:3]
+        input_graph_dict = self.representation.to_graph_dict_global_4_align(frame, next_effector_position,
+                                                                            current_effector_position)
+        input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([input_graph_dict])
+
+        # Model prediction
+        predicted_graph_tuples = self.has_moved_model(input_graph_tuples)
+
+        # Convert output graph tuple to PredictFrame
+        predicted_nodes = predicted_graph_tuples[-1].nodes.numpy()
+        # The last indices are the cloth keypoints (the first indices are rigid bodies)
+        has_moved_mask = np.argmax(predicted_nodes[:len(self.representation.keypoint_indices)], axis=1)
+        has_moved_indices = np.where(has_moved_mask > 0)
+        has_moved_indices_cloth = has_moved_indices
+
+        # Predict motion without mask
+        motion_prediction = self.motion_model.predict_frame(frame, next_effector_position)
+        unmasked_pos = motion_prediction.cloth_keypoint_positions
+
+        # Only override positions that have been classified as moving
+        original_pos = frame.get_cloth_keypoint_positions(self.representation.keypoint_indices)
+        predicted_pos = original_pos
+        predicted_pos[has_moved_indices_cloth] = unmasked_pos[has_moved_indices_cloth]
+
+        # FIXME: Rigid body prediction not yet implemented
+        rigid_body_positions = None
+
+        return PredictedFrame(predicted_pos, rigid_body_positions)
 
 
 if __name__ == '__main__':
