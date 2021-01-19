@@ -96,8 +96,10 @@ class Evaluation:
 
 
 if __name__ == '__main__':
-    # model = FullyConnectedPredictionModel()
+    # motion_model = FullyConnectedPredictionModel()
+    # model = HasMovedMaskPredictionModel(motion_model)
     model = FullyConnectedMaskedPredictionModel()
+
     eval = Evaluation(model)
 
     dataset_name = "train"
