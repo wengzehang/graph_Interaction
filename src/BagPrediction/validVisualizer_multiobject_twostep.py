@@ -354,6 +354,8 @@ if __name__ == '__main__':
     checkpoint_mask.restore(latest_mask)
     print("Loading latest checkpoint for the mask module: ", latest_mask)
 
+    USE_SOFTMASK = False
+
     #######################
 
     scenario_index = 0
@@ -367,7 +369,7 @@ if __name__ == '__main__':
     prev_input_graph_tuples = None
     # for i_scenario in range(newdata.num_scenarios):
     # only select 5 scenarios for visualization
-    for i_scenario in range(5):
+    for i_scenario in range(20):
         print("done with {} scene.".format(i_scenario))
         for i_frame in range(newdata.num_frames):
             # if i_frame % 3 == 0 and (i_frame < newdata.num_frames-1):
@@ -405,20 +407,21 @@ if __name__ == '__main__':
                 # computer the hasmoved mask
                 current_predict_mask_tuples = compute_output(module=module_mask, inputs_tr=prev_input_graph_tuples)
                 # FIXME: Use the last processed graph output info to construct the next input, I re-calculate the edge attributes, and use the ground-truth effector position
-                nonmovedIndices = current_predict_mask_tuples[0].nodes.numpy()
-
-                # nonmovedIndices[:, 0] > 0.5
-                #
-                # prev_input_graph_tuples.nodes.numpy()[:,:3]
-                # current_predict_tuples[-1].nodes.numpy()
 
                 # get the predicted object center positions in the current frame from the last processed stage
                 current_node_recover = current_predict_tuples[-1].nodes.numpy()
 
                 # renew the fixed points
-                current_node_recover[SimulatedData.fix_keypoint_place,:3] = prev_graph_dict['nodes'][SimulatedData.fix_keypoint_place,:3]
-                current_node_recover[nonmovedIndices[:, 0] > 0.5,:3] = prev_graph_dict['nodes'][nonmovedIndices[:, 0] > 0.5,:3]
-                # current_node_recover[:,:3] = prev_graph_dict['nodes'][:,:3]
+                current_node_recover[SimulatedData.fix_keypoint_place, :3] = prev_graph_dict['nodes'][
+                                                                             SimulatedData.fix_keypoint_place, :3]
+
+                nonmovedIndices = current_predict_mask_tuples[0].nodes.numpy()
+                if USE_SOFTMASK == False:
+                    # use hard mask
+                    current_node_recover[nonmovedIndices[:, 0] > 0.5,:3] = prev_graph_dict['nodes'][nonmovedIndices[:, 0] > 0.5,:3]
+                else:
+                    # use the soft mask
+                    current_node_recover[:,:3] = nonmovedIndices[:,0].reshape(-1,1) * prev_graph_dict['nodes'][:,:3] + nonmovedIndices[:,1].reshape(-1,1)*current_node_recover[:,:3]
 
                 # add the previous effectornonmovedIndices[:,0] > 0.5 position back to transform the center position to global coordinate
                 current_node_recover[:,:3] += gt_prev_effector_pose[:3]

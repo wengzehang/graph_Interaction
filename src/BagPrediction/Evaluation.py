@@ -119,3 +119,5 @@ if __name__ == '__main__':
     print(result.horizon_pos_error_mean)
 
     plt.bar(range(result.horizon_pos_error_mean.shape[0]), result.horizon_pos_error_mean)
+
+    plt.show()
