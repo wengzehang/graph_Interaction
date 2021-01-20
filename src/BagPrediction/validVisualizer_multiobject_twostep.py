@@ -331,7 +331,7 @@ if __name__ == '__main__':
 
     #####################3333
 
-    model_path_dyn = "./models/test-13"
+    model_path_dyn = "./models/test-14" # 13
     checkpoint_root_dyn = model_path_dyn + "/checkpoints"
     checkpoint_name_dyn = "checkpoint-1"
     checkpoint_save_prefix_dyn = os.path.join(checkpoint_root_dyn, checkpoint_name_dyn)
@@ -367,7 +367,7 @@ if __name__ == '__main__':
     prev_input_graph_tuples = None
     # for i_scenario in range(newdata.num_scenarios):
     # only select 5 scenarios for visualization
-    for i_scenario in range(10):
+    for i_scenario in range(5):
         print("done with {} scene.".format(i_scenario))
         for i_frame in range(newdata.num_frames):
             # if i_frame % 3 == 0 and (i_frame < newdata.num_frames-1):

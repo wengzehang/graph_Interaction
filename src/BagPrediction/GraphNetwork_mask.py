@@ -150,23 +150,36 @@ module_mask = GraphNetworkModules.EncodeProcessDecode(
 )
 
 
-def compute_output_and_loss(inputs_tr, targets_tr, edgetype=None):
-    # calculate the mask
-    nodenumber = tf.shape(inputs_tr.nodes)[0]
-    movedmask = tf.argmax(compute_hasmovedmask(inputs_tr), axis=1)
-    movedmask = tf.reshape(tf.cast(movedmask, tf.float32), [nodenumber,1])
-
+def compute_output_and_loss(inputs_tr, targets_tr, edgetype=None, softmask=True):
     outputs_tr = module_dyn(inputs_tr)
+    nodenumber = tf.shape(inputs_tr.nodes)[0]
+    probmask = compute_hasmovedmask(inputs_tr)
+    # calculate the mask
+    if softmask == False:
+        movedmask = tf.argmax(probmask, axis=1)
+        movedmask = tf.reshape(tf.cast(movedmask, tf.float32), [nodenumber,1])
 
-    # TODO: changed to soft mask
-    if movedmask != None:
         masked_output = [
             (1 - movedmask) * inputs_tr.nodes[:, :3] + \
             movedmask * output.nodes[:, :3]
 
             for output in outputs_tr
         ]
+
+    elif softmask == True:
+        movedmask = tf.cast(probmask, tf.float32)
+
+        # TODO: changed to soft mask
+        masked_output = [
+            tf.reshape(movedmask[:,0],[nodenumber, 1]) * inputs_tr.nodes[:, :3] + \
+            tf.reshape(movedmask[:,1], [nodenumber, 1]) * output.nodes[:, :3]
+
+            for output in outputs_tr
+        ]
+
     else:
+        # give -1
+        # non-masked output
         masked_output = [
             output.nodes[:, :3]
 
@@ -197,7 +210,7 @@ def update_step(inputs_tr, targets_tr):
 compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_output_and_loss = tf.function(compute_output_and_loss, experimental_relax_shapes=True)
 
-model_path_dyn = "./models/test-13" # root for saving dynamics estimation module checkpoints
+model_path_dyn = "./models/test-14" # root 14 for soft mask, root 13 for saving dynamics estimation module checkpoints
 checkpoint_root_dyn = model_path_dyn + "/checkpoints"
 checkpoint_name_dyn = "checkpoint-1"
 checkpoint_save_prefix_dyn = os.path.join(checkpoint_root_dyn, checkpoint_name_dyn)
