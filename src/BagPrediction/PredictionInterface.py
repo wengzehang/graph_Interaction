@@ -24,3 +24,8 @@ class PredictionInterface:
     def predict_frame_list(self, frames: List[SimulatedData.Frame]):
         # Implement batch prediction in implementation if possible
         return [self.predict_frame(frame) for frame in frames]
+
+    def prepare_scenario(self, scenario: SimulatedData.Scenario):
+        # This method is used to predict anchor frames with a long horizon model
+        # It is called before any predict_frame() call is made for that scenario
+        pass

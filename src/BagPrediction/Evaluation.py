@@ -3,7 +3,7 @@ Evaluation code for prediction models
 """
 
 from PredictionInterface import PredictionInterface, PredictedFrame
-from PredictionModels import FullyConnectedPredictionModel, FullyConnectedMaskedPredictionModel
+from PredictionModels import *
 from SimulatedData import SimulatedData, Scenario, Frame, keypoint_indices
 
 import matplotlib
@@ -41,6 +41,8 @@ class Evaluation:
         for scenario_index in range(num_scenarios):
             print("Scenario", scenario_index)
             scenario = data.scenario(scenario_index)
+            self.model.prepare_scenario(scenario)
+
             next_frame = scenario.frame(0)
             for frame_index in range(data.num_frames - 1):
                 current_frame = next_frame
@@ -62,6 +64,7 @@ class Evaluation:
         for scenario_index in range(num_scenarios):
             print("Scenario", scenario_index)
             scenario = data.scenario(scenario_index)
+            self.model.prepare_scenario(scenario)
 
             current_frame = scenario.frame(0)
             next_frame = scenario.frame(1)
@@ -83,6 +86,8 @@ class Evaluation:
                 errors_per_step[frame_index][scenario_index] = \
                     self.calculate_keypoint_pos_error(predicted_frame, next_frame)
 
+                prev_predicted_frame = predicted_frame
+
         mean_error_per_step = np.mean(errors_per_step, axis=-1)
         return mean_error_per_step
 
@@ -96,11 +101,15 @@ class Evaluation:
 
 
 if __name__ == '__main__':
-    # motion_model = FullyConnectedPredictionModel()
-    # model = HasMovedMaskPredictionModel(motion_model)
-    model = FullyConnectedMaskedPredictionModel()
+    single_motion_model = FullyConnectedPredictionModel()
+    single_model = HasMovedMaskPredictionModel(single_motion_model)
+    horizon_model = FullyConnectedHorizonPredictionModel(
+        single_model, frame_step=5)
+    #model = FullyConnectedMaskedPredictionModel()
 
-    eval = Evaluation(model)
+    # TODO: Evaluate all scenarios, but for now only do a small amount for faster testing
+    eval = Evaluation(horizon_model,
+                      max_scenario_index=10)
 
     dataset_name = "train"
     if dataset_name == "train":
@@ -119,3 +128,4 @@ if __name__ == '__main__':
     print(result.horizon_pos_error_mean)
 
     plt.bar(range(result.horizon_pos_error_mean.shape[0]), result.horizon_pos_error_mean)
+    plt.show()
