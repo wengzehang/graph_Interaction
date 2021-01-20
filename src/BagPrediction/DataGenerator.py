@@ -22,7 +22,7 @@ class DataGeneratorBase:
         self.frame_step = frame_step
 
         # We can generate a sample from each adjacent frame pair
-        self.num_samples = data.num_scenarios * (data.num_frames - 1)
+        self.num_samples = data.num_scenarios * (data.num_frames - frame_step)
 
         self.representation = GraphRepresentation.GraphRepresentation_rigid_deformable(SimulatedData.keypoint_indices,
                                                                                        SimulatedData.keypoint_edges)
