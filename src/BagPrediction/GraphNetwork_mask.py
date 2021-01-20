@@ -15,12 +15,12 @@ import GraphNetworkModules
 import DataGenerator
 
 
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-  try:
-    tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=6144)])
-  except RuntimeError as e:
-    print(e)
+# gpus = tf.config.experimental.list_physical_devices('GPU')
+# if gpus:
+#   try:
+#     tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=6144)])
+#   except RuntimeError as e:
+#     print(e)
 
 
 train_path_to_topodict = 'h5data/topo_train.pkl'
@@ -197,7 +197,7 @@ def update_step(inputs_tr, targets_tr):
 compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_output_and_loss = tf.function(compute_output_and_loss, experimental_relax_shapes=True)
 
-model_path_dyn = "./models/test-13" # root for saving dynamics estimation module checkpoints
+model_path_dyn = "./models/masked-prediction-1" # root for saving dynamics estimation module checkpoints
 checkpoint_root_dyn = model_path_dyn + "/checkpoints"
 checkpoint_name_dyn = "checkpoint-1"
 checkpoint_save_prefix_dyn = os.path.join(checkpoint_root_dyn, checkpoint_name_dyn)
@@ -216,8 +216,8 @@ else:
 
 
 # load the trained mask module
-model_path_mask = "./models/test-11" # root for saving mask estimation module checkpoints
-#model_path = "./models/has-moved-2"
+#model_path_mask = "./models/test-11" # root for saving mask estimation module checkpoints
+model_path_mask = "./models/has-moved-2"
 checkpoint_root_mask = model_path_mask + "/checkpoints"
 checkpoint_name_mask = "checkpoint-1"
 checkpoint_save_prefix_mask = os.path.join(checkpoint_root_mask, checkpoint_name_mask)
