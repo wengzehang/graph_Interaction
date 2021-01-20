@@ -324,11 +324,13 @@ class FullyConnectedHorizonPredictionModel(PredictionInterface):
         anchor_frames = [None] * num_anchor_frames
 
         current_frame = scenario.frame(0)
+        anchor_frames[0] = PredictedFrame(
+            current_frame.get_cloth_keypoint_positions(self.representation.keypoint_indices),
+            None)
         next_frame = scenario.frame(self.frame_step)
 
         next_effector_position = next_frame.get_effector_pose()[0]
         prev_predicted_frame = self.predict_horizon_frame(current_frame, next_effector_position)
-        anchor_frames[0] = prev_predicted_frame
 
         for anchor_index in range(1, num_anchor_frames):
             current_frame = next_frame
