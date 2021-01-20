@@ -34,12 +34,15 @@ valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
 # xxx: None for normal fully graph; 1 for partially connected graph; 2 for fully connected graph but with copied edge attribute
 #  Remember to modified the edge attr size for the network
 graph_edgetype = None # 2
+# For frame-wise prediction set frame_step to 1
+# For long horizon prediction choose a value > 1
+frame_step = 5
 
 train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
-train_generator = DataGenerator.DataGenerator(train_data, graph_edgetype)
+train_generator = DataGenerator.DataGenerator(train_data, graph_edgetype, frame_step=frame_step)
 
 valid_data = SimulatedData.SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
-valid_generator = DataGenerator.DataGenerator(valid_data, graph_edgetype)
+valid_generator = DataGenerator.DataGenerator(valid_data, graph_edgetype, frame_step=frame_step)
 
 representation = GraphRepresentation.GraphRepresentation(SimulatedData.keypoint_indices, SimulatedData.keypoint_edges)
 
@@ -197,7 +200,7 @@ def update_step(inputs_tr, targets_tr):
 compiled_update_step = tf.function(update_step, input_signature=input_signature)
 compiled_compute_output_and_loss = tf.function(compute_output_and_loss, experimental_relax_shapes=True)
 
-model_path_dyn = "./models/masked-prediction-1" # root for saving dynamics estimation module checkpoints
+model_path_dyn = "./models/masked-prediction-horizon-5" # root for saving dynamics estimation module checkpoints
 checkpoint_root_dyn = model_path_dyn + "/checkpoints"
 checkpoint_name_dyn = "checkpoint-1"
 checkpoint_save_prefix_dyn = os.path.join(checkpoint_root_dyn, checkpoint_name_dyn)
@@ -217,7 +220,7 @@ else:
 
 # load the trained mask module
 #model_path_mask = "./models/test-11" # root for saving mask estimation module checkpoints
-model_path_mask = "./models/has-moved-2"
+model_path_mask = "./models/has-moved-horizon-5"
 checkpoint_root_mask = model_path_mask + "/checkpoints"
 checkpoint_name_mask = "checkpoint-1"
 checkpoint_save_prefix_mask = os.path.join(checkpoint_root_mask, checkpoint_name_mask)
@@ -229,7 +232,7 @@ print("Loading latest checkpoint for the mask module: ", latest_mask)
 
 # How many training steps before we do a validation run (+ checkpoint)
 train_steps_per_validation = 100
-validation_batch_size = 512# valid_generator.num_samples
+validation_batch_size = 1024# valid_generator.num_samples
 
 batch_size = 32
 log_every_seconds = 1
@@ -250,7 +253,7 @@ for iteration in range(0, 2000):
         checkpoint_dyn.save(checkpoint_save_prefix_dyn)
         min_loss = loss_val_np
 
-    print("# {:05d}, Loss Train {:.4f}, Valid {:.4f}, Min {:.4f}".format(iteration,
+    print("# {:05d}, Loss Train {:.5f}, Valid {:.5f}, Min {:.5f}".format(iteration,
                                                                          loss_tr.numpy(),
                                                                          loss_val_np,
                                                                          min_loss))
