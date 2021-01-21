@@ -69,9 +69,11 @@ class DataGenerator(DataGeneratorBase):
     def __init__(self,
                  data: SimulatedData.SimulatedData,
                  edgetype=None,
+                 add_noise=True,
                  frame_step: int = 1):
         super().__init__(data, frame_step)
         self.edgetype = edgetype
+        self.add_noise = add_noise
 
     def create_input_and_target_graph_dict(self,
                                            current_frame: SimulatedData.Frame,
@@ -93,10 +95,12 @@ class DataGenerator(DataGeneratorBase):
         if self.edgetype == None:
             # xxx: fully connected graph
             current_graph = self.representation.to_graph_dict_global_4_align(current_frame, next_frame_effector,
-                                                                                     current_frame_effector[:3])
+                                                                             current_frame_effector[:3],
+                                                                             add_noise=self.add_noise)
             next_graph = self.representation.to_graph_dict_global_4_align(next_frame,
-                                                                              potential_future_frame_effector,
-                                                                              current_frame_effector[:3])
+                                                                          potential_future_frame_effector,
+                                                                          current_frame_effector[:3],
+                                                                          add_noise=self.add_noise)
         elif self.edgetype == 1:
             # xxx: partially connected graph
             current_graph = self.representation.to_graph_dict_global_align_type1(current_frame, next_frame_effector,

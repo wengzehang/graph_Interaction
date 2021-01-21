@@ -36,10 +36,10 @@ valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
 graph_edgetype = 1
 
 train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
-train_generator = DataGenerator.DataGenerator(train_data, graph_edgetype)
+train_generator = DataGenerator.DataGenerator(train_data, graph_edgetype, add_noise=True)
 
 valid_data = SimulatedData.SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
-valid_generator = DataGenerator.DataGenerator(valid_data, graph_edgetype)
+valid_generator = DataGenerator.DataGenerator(valid_data, graph_edgetype, add_noise=True)
 
 representation = GraphRepresentation.GraphRepresentation(SimulatedData.keypoint_indices, SimulatedData.keypoint_edges)
 
