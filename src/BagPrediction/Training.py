@@ -20,12 +20,19 @@ valid_path_to_topodict = 'h5data/topo_valid.pkl'
 valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
 
 movement_threshold = 0.001
+# For frame-wise prediction set frame_step to 1
+# For long horizon prediction choose a value > 1
+frame_step = 5
 
 train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
-train_generator = DataGenerator.DataGeneratorHasMoved(train_data, movement_threshold=movement_threshold)
+train_generator = DataGenerator.DataGeneratorHasMoved(train_data,
+                                                      movement_threshold=movement_threshold,
+                                                      frame_step=frame_step)
 
 valid_data = SimulatedData.SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
-valid_generator = DataGenerator.DataGeneratorHasMoved(valid_data, movement_threshold=movement_threshold)
+valid_generator = DataGenerator.DataGeneratorHasMoved(valid_data,
+                                                      movement_threshold=movement_threshold,
+                                                      frame_step=frame_step)
 
 
 def make_mlp(layers):
@@ -135,8 +142,8 @@ compiled_compute_outputs = tf.function(compute_outputs, experimental_relax_shape
 compiled_predict = tf.function(predict, experimental_relax_shapes=True)
 
 # Checkpoint stuff
-model_path = "./models/test-11"
-#model_path = "./models/has-moved-2"
+#model_path = "./models/test-11"
+model_path = "./models/has-moved-horizon-5"
 checkpoint_root = model_path + "/checkpoints"
 checkpoint_name = "checkpoint-1"
 checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)

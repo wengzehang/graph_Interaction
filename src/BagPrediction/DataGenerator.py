@@ -14,18 +14,22 @@ import GraphRepresentation
 
 
 class DataGeneratorBase:
-    def __init__(self, data: SimulatedData.SimulatedData):
+    def __init__(self,
+                 data: SimulatedData.SimulatedData,
+                 frame_step: int = 1):
         self.data = data
+        # How many frames ahead is the next frame (used for long horizon prediction)
+        self.frame_step = frame_step
 
         # We can generate a sample from each adjacent frame pair
-        self.num_samples = data.num_scenarios * (data.num_frames - 1)
+        self.num_samples = data.num_scenarios * (data.num_frames - frame_step)
 
         self.representation = GraphRepresentation.GraphRepresentation_rigid_deformable(SimulatedData.keypoint_indices,
                                                                                        SimulatedData.keypoint_edges)
 
         self.indices = [(scenario_index, frame_index)
                         for scenario_index in range(0, data.num_scenarios)
-                        for frame_index in range(0, data.num_frames - 1)]
+                        for frame_index in range(0, data.num_frames - frame_step)]
 
         self.generated_count = 0
         self.has_reshuffled = False
@@ -51,7 +55,7 @@ class DataGeneratorBase:
         for i, (scenario_index, frame_index) in enumerate(batch_indices):
             scenario = self.data.scenario(scenario_index)
             current_frame = scenario.frame(frame_index)
-            next_frame = scenario.frame(frame_index + 1)
+            next_frame = scenario.frame(frame_index + self.frame_step)
 
             # input_dicts[i], target_dicts[i] = self.create_input_and_target_graph_dict(current_frame, next_frame)
             input_dicts[i], target_dicts[i] = self.create_input_and_target_graph_dict(current_frame, next_frame)
@@ -62,8 +66,11 @@ class DataGeneratorBase:
 
 
 class DataGenerator(DataGeneratorBase):
-    def __init__(self, data: SimulatedData.SimulatedData, edgetype=None):
-        super().__init__(data)
+    def __init__(self,
+                 data: SimulatedData.SimulatedData,
+                 edgetype=None,
+                 frame_step: int = 1):
+        super().__init__(data, frame_step)
         self.edgetype = edgetype
 
     def create_input_and_target_graph_dict(self,
@@ -126,10 +133,12 @@ class DataGenerator(DataGeneratorBase):
 
 
 class DataGeneratorHasMoved(DataGeneratorBase):
-    def __init__(self, data: SimulatedData.SimulatedData,
+    def __init__(self,
+                 data: SimulatedData.SimulatedData,
+                 frame_step: int = 1,
                  movement_threshold=0.001,
                  noise_stddev=0.002):
-        super().__init__(data)
+        super().__init__(data, frame_step)
 
         self.movement_threshold = movement_threshold
         self.noise_stddev = noise_stddev
@@ -206,7 +215,7 @@ class DataGeneratorHasMoved(DataGeneratorBase):
         distances[combineindices,3] = 1 # denote the physical connection
 
         input_graph_dict = {
-            "globals": global_features,  # TODO: Fill global field with action parameter
+            "globals": global_features,
             "nodes": info_all,  # info_all,# info_all, # positions,
             "edges": distances,
             "senders": keypoint_edges_from_ALL,
@@ -214,7 +223,7 @@ class DataGeneratorHasMoved(DataGeneratorBase):
         }
 
         output_graph_dict = {
-            "globals": global_features,  # TODO: Fill global field with action parameter
+            "globals": global_features,
             "nodes": has_moved_label,
             "edges": distances,
             "senders": keypoint_edges_from_ALL,

@@ -3,12 +3,13 @@ Evaluation code for prediction models
 """
 
 from PredictionInterface import PredictionInterface, PredictedFrame
-from PredictionModels import FullyConnectedPredictionModel, FullyConnectedMaskedPredictionModel
+from PredictionModels import *
 from SimulatedData import SimulatedData, Scenario, Frame, keypoint_indices
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import csv
 
 
 class EvaluationResult:
@@ -41,6 +42,8 @@ class Evaluation:
         for scenario_index in range(num_scenarios):
             print("Scenario", scenario_index)
             scenario = data.scenario(scenario_index)
+            self.model.prepare_scenario(scenario)
+
             next_frame = scenario.frame(0)
             for frame_index in range(data.num_frames - 1):
                 current_frame = next_frame
@@ -62,6 +65,7 @@ class Evaluation:
         for scenario_index in range(num_scenarios):
             print("Scenario", scenario_index)
             scenario = data.scenario(scenario_index)
+            self.model.prepare_scenario(scenario)
 
             current_frame = scenario.frame(0)
             next_frame = scenario.frame(1)
@@ -83,6 +87,8 @@ class Evaluation:
                 errors_per_step[frame_index][scenario_index] = \
                     self.calculate_keypoint_pos_error(predicted_frame, next_frame)
 
+                prev_predicted_frame = predicted_frame
+
         mean_error_per_step = np.mean(errors_per_step, axis=-1)
         return mean_error_per_step
 
@@ -96,11 +102,19 @@ class Evaluation:
 
 
 if __name__ == '__main__':
-    # motion_model = FullyConnectedPredictionModel()
-    # model = HasMovedMaskPredictionModel(motion_model)
-    model = FullyConnectedMaskedPredictionModel()
+    single_motion_model = FullyConnectedPredictionModel()
+    #single_model = HasMovedMaskPredictionModel(single_motion_model)
+    #model = FullyConnectedHorizonPredictionModel(
+    #    single_model, frame_step=5)
+#    model = FullyConnectedMaskedPredictionModel(model_dyn_path="./models/masked-prediction-1",
+#                                                model_mask_path="./models/has-moved-2",
+#                                                checkpoint_dyn_to_load=None,
+#                                                checkpoint_mask_to_load=None)
+    model = single_motion_model
 
-    eval = Evaluation(model)
+    # TODO: Evaluate all scenarios, but for now only do a small amount for faster testing
+    eval = Evaluation(model,
+                      max_scenario_index=10)
 
     dataset_name = "train"
     if dataset_name == "train":
@@ -118,6 +132,13 @@ if __name__ == '__main__':
     print("Frame-wise errors:")
     print(result.horizon_pos_error_mean)
 
-    plt.bar(range(result.horizon_pos_error_mean.shape[0]), result.horizon_pos_error_mean)
+    filename = "eval_" + dataset_name + "_one-stage.csv"
+    with open(filename, mode='w') as file:
+        writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(["cloth_pos_error_mean"])
+        row_count = result.horizon_pos_error_mean.shape[0]
+        for i in range(row_count):
+            writer.writerow([result.horizon_pos_error_mean[i]])
 
+    plt.bar(range(result.horizon_pos_error_mean.shape[0]), result.horizon_pos_error_mean)
     plt.show()
