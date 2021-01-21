@@ -103,17 +103,18 @@ class Evaluation:
 
 if __name__ == '__main__':
     single_motion_model = FullyConnectedPredictionModel()
-    single_model = HasMovedMaskPredictionModel(single_motion_model)
+    #single_model = HasMovedMaskPredictionModel(single_motion_model)
     #model = FullyConnectedHorizonPredictionModel(
     #    single_model, frame_step=5)
 #    model = FullyConnectedMaskedPredictionModel(model_dyn_path="./models/masked-prediction-1",
 #                                                model_mask_path="./models/has-moved-2",
 #                                                checkpoint_dyn_to_load=None,
 #                                                checkpoint_mask_to_load=None)
+    model = single_motion_model
 
     # TODO: Evaluate all scenarios, but for now only do a small amount for faster testing
-    eval = Evaluation(single_model,
-                      max_scenario_index=100)
+    eval = Evaluation(model,
+                      max_scenario_index=10)
 
     dataset_name = "train"
     if dataset_name == "train":
@@ -131,7 +132,7 @@ if __name__ == '__main__':
     print("Frame-wise errors:")
     print(result.horizon_pos_error_mean)
 
-    filename = "eval_" + dataset_name + "_single.csv"
+    filename = "eval_" + dataset_name + "_one-stage.csv"
     with open(filename, mode='w') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(["cloth_pos_error_mean"])
@@ -139,5 +140,5 @@ if __name__ == '__main__':
         for i in range(row_count):
             writer.writerow([result.horizon_pos_error_mean[i]])
 
-    #plt.bar(range(result.horizon_pos_error_mean.shape[0]), result.horizon_pos_error_mean)
-    #plt.show()
+    plt.bar(range(result.horizon_pos_error_mean.shape[0]), result.horizon_pos_error_mean)
+    plt.show()
