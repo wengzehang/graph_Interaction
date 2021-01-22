@@ -2,6 +2,11 @@
 Model specification for unified training and prediction models
 """
 
+import GraphNetworkModules
+
+import sonnet as snt
+import tensorflow as tf
+
 from enum import Enum
 from typing import List
 
@@ -29,6 +34,7 @@ class NodeFormat(Enum):
             NodeFormat.XYZ: 3,
             NodeFormat.XYZR: 4,
             NodeFormat.XYZR_FixedFlag: 5,
+            NodeFormat.HasMovedClasses: 2,
         }
         result = switcher.get(self, None)
         if result is None:
@@ -142,6 +148,29 @@ class GraphNetStructure:
         self.node_activation_function = node_activation_function
 
 
+def snt_mlp(layers):
+    return lambda: snt.Sequential([
+        snt.nets.MLP(layers, activate_final=True),
+        snt.LayerNorm(axis=-1, create_offset=True, create_scale=True)
+    ])
+
+
+def snt_softmax(size: int):
+    return lambda: snt.nets.MLP(
+        [size],
+        activation=tf.nn.softmax,
+        activate_final=True,
+        name="node_output")
+
+
+def create_node_output_function(node_format: NodeFormat):
+    if node_format == NodeFormat.HasMovedClasses:
+        return snt_softmax(node_format.size())
+    else:
+        # A linear function is used inside EncodeProcessDecode
+        return None
+
+
 class ModelSpecification:
     """
     Specification of a trainable model.
@@ -179,3 +208,19 @@ class ModelSpecification:
         self.input_graph_format = input_graph_format
         self.output_graph_format = output_graph_format
         self.graph_net_structure = graph_net_structure
+
+    def create_graph_net(self, name):
+        return GraphNetworkModules.EncodeProcessDecode(
+            name=name,
+            make_encoder_edge_model=snt_mlp(self.graph_net_structure.encoder_edge_layers),
+            make_encoder_node_model=snt_mlp(self.graph_net_structure.encoder_node_layers),
+            make_encoder_global_model=snt_mlp(self.graph_net_structure.encoder_global_layers),
+            make_core_edge_model=snt_mlp(self.graph_net_structure.core_edge_layers),
+            make_core_node_model=snt_mlp(self.graph_net_structure.core_node_layers),
+            make_core_global_model=snt_mlp(self.graph_net_structure.core_global_layers),
+            num_processing_steps=self.graph_net_structure.num_processing_steps,
+            edge_output_size=self.output_graph_format.edge_format.size(),
+            node_output_size=self.output_graph_format.node_format.size(),
+            global_output_size=self.output_graph_format.global_format.size(),
+            node_output_fn=create_node_output_function(self.output_graph_format.node_format),
+    )
