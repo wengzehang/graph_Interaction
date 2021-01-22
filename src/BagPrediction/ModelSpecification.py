@@ -16,8 +16,25 @@ class NodeFormat(Enum):
     TODO: What about fixed flags?
     """
     Dummy = 0
-    XYZR = 1
-    HasMovedClasses = 2
+
+    XYZ = 10
+    XYZR = 11
+    XYZR_FixedFlag = 12
+
+    HasMovedClasses = 20
+
+    def size(self):
+        switcher = {
+            NodeFormat.Dummy: 1,
+            NodeFormat.XYZ: 3,
+            NodeFormat.XYZR: 4,
+            NodeFormat.XYZR_FixedFlag: 5,
+        }
+        result = switcher.get(self, None)
+        if result is None:
+            raise ValueError("NodeFormat is not handled in size() function:", self)
+        else:
+            return result
 
 
 class EdgeFormat(Enum):
@@ -28,7 +45,21 @@ class EdgeFormat(Enum):
     DiffXYZ: Position difference (XYZ) to the adjacent node.
     """
     Dummy = 0
-    DiffXYZ = 1
+
+    DiffXYZ = 10
+    DiffXYZ_ConnectionFlag = 11
+
+    def size(self):
+        switcher = {
+            EdgeFormat.Dummy: 1,
+            EdgeFormat.DiffXYZ: 3,
+            EdgeFormat.DiffXYZ_ConnectionFlag: 4,
+        }
+        result = switcher.get(self, None)
+        if result is None:
+            raise ValueError("EdgeFormat is not handled in size() function:", self)
+        else:
+            return result
 
 
 class GlobalFormat(Enum):
@@ -41,8 +72,20 @@ class GlobalFormat(Enum):
     TODO: Right hand, left hand?
     """
     Dummy = 0
-    NextEndEffectorXYZ = 1
-    NextHandPositionXYZ = 2
+    NextEndEffectorXYZ = 10
+    NextHandPositionXYZ = 20
+
+    def size(self):
+        switcher = {
+            GlobalFormat.Dummy: 1,
+            GlobalFormat.NextEndEffectorXYZ: 3,
+            GlobalFormat.NextHandPositionXYZ: 3,
+        }
+        result = switcher.get(self, None)
+        if result is None:
+            raise ValueError("GlobalFormat is not handled in size() function:", self)
+        else:
+            return result
 
 
 class PositionFrame(Enum):
@@ -64,7 +107,7 @@ class GraphAttributeFormat:
                  position_frame: PositionFrame = PositionFrame.LocalToEndEffector):
         self.node_format = node_format
         self.edge_format = edge_format
-        self.globals = global_format
+        self.global_format = global_format
         self.position_frame = position_frame
 
 
@@ -88,9 +131,6 @@ class GraphNetStructure:
                  core_node_layers: List[int] = None,
                  core_global_layers: List[int] = None,
                  num_processing_steps=5,
-                 edge_output_size=4,
-                 node_output_size=5,
-                 global_output_size=4,
                  node_activation_function=NodeActivationFunction.Linear):
         self.encoder_edge_layers = encoder_edge_layers
         self.encoder_node_layers = encoder_node_layers
@@ -99,9 +139,6 @@ class GraphNetStructure:
         self.core_node_layers = core_node_layers
         self.core_global_layers = core_global_layers
         self.num_processing_steps = num_processing_steps
-        self.edge_output_size = edge_output_size
-        self.node_output_size = node_output_size
-        self.global_output_size = global_output_size
         self.node_activation_function = node_activation_function
 
 
