@@ -6,6 +6,7 @@ import GraphNetworkModules
 
 import sonnet as snt
 import tensorflow as tf
+import numpy as np
 
 from enum import Enum
 from typing import List, Tuple
@@ -42,6 +43,28 @@ class NodeFormat(Enum):
         else:
             return result
 
+    def compute_features(self, data: np.array, current_data: np.array, next_data: np.array):
+        if self == NodeFormat.Dummy:
+            return np.zeros(1, np.float32)
+        elif self == NodeFormat.XYZ:
+            return data[:, :3]
+        elif self == NodeFormat.XYZR:
+            return data[:, :4]
+        elif self == NodeFormat.XYZR_FixedFlag:
+            return data[:, :5]
+        elif self == NodeFormat.HasMovedClasses:
+            # See whether the nodes have moved or not
+            positions_current = current_data[:, :3]
+            positions_next = next_data[:, :3]
+            positions_diff = np.linalg.norm(positions_next - positions_current, axis=-1).reshape(-1, 1)
+            has_moved = positions_diff > self.movement_threshold
+            has_not_moved = positions_diff <= self.movement_threshold
+            # The has_moved label is [1.0, 0.0] if the node did not move and [0.0, 1.0] if it moved
+            has_moved_label = np.hstack((has_not_moved, has_moved)).astype(np.float32)
+            return has_moved_label
+        else:
+            raise NotImplementedError("")
+
 
 class EdgeFormat(Enum):
     """
@@ -73,18 +96,18 @@ class GlobalFormat(Enum):
     Global attribute format
 
     Dummy: One float is used as a dummy attribute.
-    NextEndEffectorXYZ: Next position (XYZ) of the end effector (ball).
+    NextEndEffectorXYZR: Next position (XYZ) of the end effector (ball) and radius (R).
     NextHandPositionXYZ: Next position (XYZ) of the hand holding part of the bag.
     TODO: Right hand, left hand?
     """
     Dummy = 0
-    NextEndEffectorXYZ = 10
+    NextEndEffectorXYZR = 10
     NextHandPositionXYZ = 20
 
     def size(self):
         switcher = {
             GlobalFormat.Dummy: 1,
-            GlobalFormat.NextEndEffectorXYZ: 3,
+            GlobalFormat.NextEndEffectorXYZR: 4,
             GlobalFormat.NextHandPositionXYZ: 3,
         }
         result = switcher.get(self, None)
@@ -92,6 +115,21 @@ class GlobalFormat(Enum):
             raise ValueError("GlobalFormat is not handled in size() function:", self)
         else:
             return result
+
+    def compute_features(self, effector_xyzr_current: np.array, effector_xyzr_next: np.array):
+        effector_position_diff = effector_xyzr_next[:3] - effector_xyzr_current[:3]
+        effector_radius = effector_xyzr_current[3]
+
+        if self == ModelSpecification.GlobalFormat.Dummy:
+            features = np.zeros(1, np.float32)
+        elif self == ModelSpecification.GlobalFormat.NextEndEffectorXYZR:
+            features = np.zeros(4, np.float32)
+            features[:3] = effector_position_diff
+            features[3] = effector_radius
+        else:
+            raise NotImplementedError("Global format is not handled:", self)
+
+        return features
 
 
 class PositionFrame(Enum):
@@ -109,12 +147,10 @@ class GraphAttributeFormat:
     def __init__(self,
                  node_format: NodeFormat = NodeFormat.Dummy,
                  edge_format: EdgeFormat = EdgeFormat.Dummy,
-                 global_format: GlobalFormat = GlobalFormat.Dummy,
-                 position_frame: PositionFrame = PositionFrame.LocalToEndEffector):
+                 global_format: GlobalFormat = GlobalFormat.Dummy):
         self.node_format = node_format
         self.edge_format = edge_format
         self.global_format = global_format
-        self.position_frame = position_frame
 
 
 class ClothKeypoints:
@@ -164,10 +200,12 @@ class TrainingParams:
                  frame_step: int = 1,
                  movement_threshold: float = 0.001,
                  batch_size: int = 32,
+                 input_noise_stddev: float = 0.002,
                  ):
         self.frame_step = frame_step
         self.movement_threshold = movement_threshold
         self.batch_size = batch_size
+        self.input_noise_stddev = input_noise_stddev
 
 
 def snt_mlp(layers):
@@ -226,6 +264,7 @@ class ModelSpecification:
                  name: str = None,
                  input_graph_format: GraphAttributeFormat = None,
                  output_graph_format: GraphAttributeFormat = None,
+                 position_frame: PositionFrame = PositionFrame.LocalToEndEffector,
                  graph_net_structure: GraphNetStructure = None,
                  cloth_keypoints: ClothKeypoints = None,
                  training_params: TrainingParams = None,
@@ -233,6 +272,7 @@ class ModelSpecification:
         self.name = name
         self.input_graph_format = input_graph_format
         self.output_graph_format = output_graph_format
+        self.position_frame = position_frame
         self.graph_net_structure = graph_net_structure
         self.cloth_keypoints = cloth_keypoints
         self.training_params = training_params

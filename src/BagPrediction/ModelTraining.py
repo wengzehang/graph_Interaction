@@ -3,7 +3,10 @@ Training a model given by a specification
 """
 
 import random
+import itertools
+from typing import Tuple
 from sklearn.utils import shuffle
+import numpy as np
 from graph_nets import utils_tf
 
 import SimulatedData
@@ -14,9 +17,11 @@ import ModelSpecification
 class DataGenerator:
     def __init__(self,
                  data: SimulatedData.SimulatedData,
-                 specification: ModelSpecification.ModelSpecification):
+                 specification: ModelSpecification.ModelSpecification,
+                 trainig: bool = True):
         self.data = data
         self.specification = specification
+        self.training = trainig
 
         # We can generate a sample from each adjacent frame pair
         frame_step = specification.training_params.frame_step
@@ -35,8 +40,13 @@ class DataGenerator:
         # How many samples have been generated since the last epoch reset?
         self.generated_count = 0
 
+        keypoint_indices = specification.cloth_keypoints.indices
+        keypoint_edges = specification.cloth_keypoints.edges
+        self.keypoint_edges_from = np.array([keypoint_indices.index(f) for (f, _) in keypoint_edges])
+        self.keypoint_edges_to = np.array([keypoint_indices.index(t) for (_, t) in keypoint_edges])
+
     def next_batch(self, training: bool = True,
-                   batch_size: int = None):
+                   batch_size: int = None) -> Tuple:
         if batch_size is None:
             batch_size = self.specification.training_params.batch_size
 
@@ -72,7 +82,110 @@ class DataGenerator:
                                            current_frame: SimulatedData.Frame,
                                            next_frame: SimulatedData.Frame):
         # TODO: Implement based on model specification
-        pass
+
+        keypoint_indices = self.specification.cloth_keypoints.indices
+        fixed_keypoint_indices = self.specification.cloth_keypoints.fixed_indices
+
+        # Cloth object node features
+        # Format: Position (XYZ), Radius (R), InverseDense flag (0 if fixed, 1 if movable)
+        cloth_data_current = np.float32(current_frame.get_cloth_keypoint_info(keypoint_indices, fixed_keypoint_indices))
+
+        # Rigid object node features
+        # Format: Position (XYZ), Radius (R), InverseDense flag (always 1 for movable)
+        rigid_data_current = np.float32(current_frame.get_rigid_keypoint_info())
+
+        # Data for all nodes is stacked (cloth first, rigid second)
+        node_data_current = np.vstack((cloth_data_current, rigid_data_current))
+
+        # Cloth object node features
+        # Format: Position (XYZ), Radius (R), InverseDense flag (0 if fixed, 1 if movable)
+        cloth_data_next = np.float32(next_frame.get_cloth_keypoint_info(keypoint_indices, fixed_keypoint_indices))
+
+        # Rigid object node features
+        # Format: Position (XYZ), Radius (R), InverseDense flag (always 1 for movable)
+        rigid_data_next = np.float32(next_frame.get_rigid_keypoint_info())
+
+        node_data_next = np.vstack((cloth_data_next, rigid_data_next))
+
+        num_nodes = node_data_current.shape[0]
+        # A fully connected graph has #nodes^2 edges
+        num_edges = num_nodes * num_nodes
+
+        # TensorFlow expects float32 values, the dataset contains float64 values
+        effector_xyzr_current = np.float32(current_frame.get_effector_pose()).reshape(4)
+        effector_xyzr_next = np.float32(next_frame.get_effector_pose()).reshape(4)
+
+        input_global_format = self.specification.input_graph_format.global_format
+        input_global_features = input_global_format.compute_features(effector_xyzr_current,
+                                                                     effector_xyzr_next)
+
+        output_global_format = self.specification.output_graph_format.global_format
+        output_global_features = output_global_format.compute_features(effector_xyzr_current,
+                                                                       effector_xyzr_next)
+        # Move to ModelSpecification.py?
+        position_frame = self.specification.position_frame
+        if position_frame == ModelSpecification.PositionFrame.Global:
+            # No transformation needed
+            pass
+        elif position_frame == ModelSpecification.PositionFrame.LocalToEndEffector:
+            # Transform positions to local frame (current effector position)
+            new_origin = effector_xyzr_current[:3]
+            node_data_current[:, :3] -= new_origin
+            node_data_next[:, :3] -= new_origin
+        else:
+            raise NotImplementedError("Position frame not implemented")
+
+        # Create output node features (before applying noise)
+        output_node_format = self.specification.input_graph_format.node_format
+        output_node_features = output_node_format.compute_features(node_data_next,
+                                                                   node_data_current, node_data_next)
+
+        positions_current = node_data_current[:, :3]
+        noise_stddev = self.specification.training_params.input_noise_stddev
+        if noise_stddev is not None:
+            noise = np.random.normal([0.0, 0.0, 0.0], noise_stddev, positions_current.shape)
+            positions_current += noise
+
+        # Create input node features (after applying noise)
+        input_node_format = self.specification.input_graph_format.node_format
+        input_node_features = input_node_format.compute_features(node_data_current,
+                                                                 node_data_current, node_data_next)
+
+        edge_index = [i for i in itertools.product(np.arange(num_nodes), repeat=2)]
+        # all connected, bidirectional
+        keypoint_edges_to_ALL, keypoint_edges_from_ALL = list(zip(*edge_index))
+
+        # The distance between adjacent nodes are the edges
+        keypoint_edges_from_ALL = list(keypoint_edges_from_ALL)
+        keypoint_edges_to_ALL = list(keypoint_edges_to_ALL)
+
+        distances = np.float32(np.zeros((len(keypoint_edges_from_ALL), 4)))  # DISTANCE 3D, CONNECTION TYPE 1.
+        distances[:, :3] = positions_current[keypoint_edges_to_ALL] - positions_current[keypoint_edges_from_ALL]
+        connected_indices = self.keypoint_edges_to * num_nodes + self.keypoint_edges_from
+        distances[connected_indices, 3] = 1  # denote the physical connection
+
+        # xxx: bidirectional
+        combineindices = self.keypoint_edges_from * num_nodes + self.keypoint_edges_to
+        # distances[combineindices,3] = 1 # denote the physical connection
+        distances[combineindices, 3] = 1  # denote the physical connection
+
+        input_graph_dict = {
+            "globals": input_global_features,
+            "nodes": input_node_features,  # info_all,# info_all, # positions,
+            "edges": distances,
+            "senders": keypoint_edges_from_ALL,
+            "receivers": keypoint_edges_to_ALL,
+        }
+
+        output_graph_dict = {
+            "globals": output_global_features,
+            "nodes": output_node_features,
+            "edges": distances,
+            "senders": keypoint_edges_from_ALL,
+            "receivers": keypoint_edges_to_ALL,
+        }
+
+        return input_graph_dict, output_graph_dict
 
 
 train_path_to_topodict = 'h5data/topo_train.pkl'

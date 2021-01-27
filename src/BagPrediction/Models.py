@@ -8,7 +8,7 @@ def specify_input_graph_format() -> GraphAttributeFormat:
     return GraphAttributeFormat(
         node_format=NodeFormat.XYZR_FixedFlag,
         edge_format=EdgeFormat.DiffXYZ_ConnectionFlag,
-        global_format=GlobalFormat.NextEndEffectorXYZ,
+        global_format=GlobalFormat.NextEndEffectorXYZR,
         position_frame=PositionFrame.LocalToEndEffector,
     )
 
@@ -17,8 +17,7 @@ def specify_position_output_graph_format() -> GraphAttributeFormat:
     return GraphAttributeFormat(
         node_format=NodeFormat.XYZ,
         edge_format=EdgeFormat.DiffXYZ,
-        global_format=GlobalFormat.Dummy,
-        position_frame=PositionFrame.LocalToEndEffector,
+        global_format=GlobalFormat.Dummy
     )
 
 
@@ -26,8 +25,7 @@ def specify_has_moved_output_graph_format() -> GraphAttributeFormat:
     return GraphAttributeFormat(
         node_format=NodeFormat.HasMovedClasses,
         edge_format=EdgeFormat.Dummy,
-        global_format=GlobalFormat.Dummy,
-        position_frame=PositionFrame.LocalToEndEffector,
+        global_format=GlobalFormat.Dummy
     )
 
 
@@ -97,6 +95,7 @@ def specify_graph_net_structure() -> GraphNetStructure:
         num_processing_steps=5,
     )
 
+
 def specify_training_params() -> TrainingParams:
     return TrainingParams(
         frame_step=1,
@@ -110,6 +109,7 @@ def specify_motion_model(name: str) -> ModelSpecification:
         name=name,
         input_graph_format=specify_input_graph_format(),
         output_graph_format=specify_position_output_graph_format(),
+        position_frame=PositionFrame.LocalToEndEffector,
         graph_net_structure=specify_graph_net_structure(),
         cloth_keypoints=specify_cloth_keypoints_for_bag(),
         training_params=specify_training_params(),
@@ -121,6 +121,7 @@ def specify_has_moved_model(name: str) -> ModelSpecification:
         name=name,
         input_graph_format=specify_input_graph_format(),
         output_graph_format=specify_has_moved_output_graph_format(),
+        position_frame=PositionFrame.LocalToEndEffector,
         graph_net_structure=specify_graph_net_structure(),
         cloth_keypoints=specify_cloth_keypoints_for_bag(),
         training_params=specify_training_params(),
