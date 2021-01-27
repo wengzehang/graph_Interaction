@@ -10,6 +10,7 @@ import numpy as np
 
 from enum import Enum
 from typing import List, Tuple
+import itertools
 
 
 class NodeFormat(Enum):
@@ -45,7 +46,7 @@ class NodeFormat(Enum):
 
     def compute_features(self, data: np.array, current_data: np.array, next_data: np.array):
         if self == NodeFormat.Dummy:
-            return np.zeros(1, np.float32)
+            return np.zeros(data.shape[0], np.float32)
         elif self == NodeFormat.XYZ:
             return data[:, :3]
         elif self == NodeFormat.XYZR:
@@ -86,9 +87,38 @@ class EdgeFormat(Enum):
         }
         result = switcher.get(self, None)
         if result is None:
-            raise ValueError("EdgeFormat is not handled in size() function:", self)
+            raise ValueError("EdgeFormat is not handled in size():", self)
         else:
             return result
+
+    def compute_features(self, positions: np.array, keypoint_edges_to, keypoint_edges_from) -> np.array:
+        num_nodes = positions.shape[0]
+        # A fully connected graph has #nodes^2 edges
+        num_edges = num_nodes * num_nodes
+
+        edge_index = [i for i in itertools.product(np.arange(num_nodes), repeat=2)]
+        # all connected, bidirectional
+        node_edges_to, node_edges_from = list(zip(*edge_index))
+
+        # The distance between adjacent nodes are the edges
+        diff_xyz_connected = np.zeros((num_edges, 4), np.float32)  # DISTANCE 3D, CONNECTION TYPE 1.
+        diff_xyz_connected[:, :3] = positions[node_edges_to] - positions[node_edges_from]
+
+        if self == EdgeFormat.Dummy:
+            return np.zeros(diff_xyz_connected.shape[0], np.float32)
+        elif self == EdgeFormat.DiffXYZ:
+            return diff_xyz_connected[:, :3]
+        elif self == EdgeFormat.DiffXYZ_ConnectionFlag:
+            # Fill connection flag
+            connected_indices = keypoint_edges_to * num_nodes + keypoint_edges_from
+            diff_xyz_connected[connected_indices, 3] = 1.0  # denote the physical connection
+            # Bidirectional
+            connected_indices = keypoint_edges_from * num_nodes + keypoint_edges_to
+            diff_xyz_connected[connected_indices, 3] = 1.0  # denote the physical connection
+
+            return np.vstack(diff_xyz_connected)
+        else:
+            raise NotImplementedError("EdgeFormat is not handled in compute_features():", self)
 
 
 class GlobalFormat(Enum):

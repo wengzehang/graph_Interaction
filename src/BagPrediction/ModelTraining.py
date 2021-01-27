@@ -76,13 +76,11 @@ class DataGenerator:
 
         input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple(input_dicts)
         target_graph_tuples = utils_tf.data_dicts_to_graphs_tuple(target_dicts)
-        return input_graph_tuples, target_graph_tuples
+        return input_graph_tuples, target_graph_tuples, new_epoch
 
     def create_input_and_target_graph_dict(self,
                                            current_frame: SimulatedData.Frame,
                                            next_frame: SimulatedData.Frame):
-        # TODO: Implement based on model specification
-
         keypoint_indices = self.specification.cloth_keypoints.indices
         fixed_keypoint_indices = self.specification.cloth_keypoints.fixed_indices
 
@@ -106,10 +104,6 @@ class DataGenerator:
         rigid_data_next = np.float32(next_frame.get_rigid_keypoint_info())
 
         node_data_next = np.vstack((cloth_data_next, rigid_data_next))
-
-        num_nodes = node_data_current.shape[0]
-        # A fully connected graph has #nodes^2 edges
-        num_edges = num_nodes * num_nodes
 
         # TensorFlow expects float32 values, the dataset contains float64 values
         effector_xyzr_current = np.float32(current_frame.get_effector_pose()).reshape(4)
@@ -140,6 +134,11 @@ class DataGenerator:
         output_node_features = output_node_format.compute_features(node_data_next,
                                                                    node_data_current, node_data_next)
 
+        output_edge_format = self.specification.input_graph_format.edge_format
+        output_edge_features = output_edge_format.compute_features(positions_next,
+                                                                   self.keypoint_edges_from,
+                                                                   self.keypoint_edges_to)
+
         positions_current = node_data_current[:, :3]
         noise_stddev = self.specification.training_params.input_noise_stddev
         if noise_stddev is not None:
@@ -151,38 +150,30 @@ class DataGenerator:
         input_node_features = input_node_format.compute_features(node_data_current,
                                                                  node_data_current, node_data_next)
 
+        input_edge_format = self.specification.input_graph_format.edge_format
+        input_edge_features = input_edge_format.compute_features(positions_current,
+                                                                 self.keypoint_edges_from,
+                                                                 self.keypoint_edges_to)
+
+        num_nodes = node_data_current.shape[0]
         edge_index = [i for i in itertools.product(np.arange(num_nodes), repeat=2)]
         # all connected, bidirectional
-        keypoint_edges_to_ALL, keypoint_edges_from_ALL = list(zip(*edge_index))
-
-        # The distance between adjacent nodes are the edges
-        keypoint_edges_from_ALL = list(keypoint_edges_from_ALL)
-        keypoint_edges_to_ALL = list(keypoint_edges_to_ALL)
-
-        distances = np.float32(np.zeros((len(keypoint_edges_from_ALL), 4)))  # DISTANCE 3D, CONNECTION TYPE 1.
-        distances[:, :3] = positions_current[keypoint_edges_to_ALL] - positions_current[keypoint_edges_from_ALL]
-        connected_indices = self.keypoint_edges_to * num_nodes + self.keypoint_edges_from
-        distances[connected_indices, 3] = 1  # denote the physical connection
-
-        # xxx: bidirectional
-        combineindices = self.keypoint_edges_from * num_nodes + self.keypoint_edges_to
-        # distances[combineindices,3] = 1 # denote the physical connection
-        distances[combineindices, 3] = 1  # denote the physical connection
+        node_edges_to, node_edges_from = list(zip(*edge_index))
 
         input_graph_dict = {
             "globals": input_global_features,
             "nodes": input_node_features,  # info_all,# info_all, # positions,
-            "edges": distances,
-            "senders": keypoint_edges_from_ALL,
-            "receivers": keypoint_edges_to_ALL,
+            "edges": input_edge_features,
+            "senders": node_edges_from,
+            "receivers": node_edges_to,
         }
 
         output_graph_dict = {
             "globals": output_global_features,
             "nodes": output_node_features,
-            "edges": distances,
-            "senders": keypoint_edges_from_ALL,
-            "receivers": keypoint_edges_to_ALL,
+            "edges": output_edge_features,
+            "senders": node_edges_from,
+            "receivers": node_edges_to,
         }
 
         return input_graph_dict, output_graph_dict
