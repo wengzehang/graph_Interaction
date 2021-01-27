@@ -8,7 +8,7 @@ import sonnet as snt
 import tensorflow as tf
 
 from enum import Enum
-from typing import List
+from typing import List, Tuple
 
 
 class NodeFormat(Enum):
@@ -117,6 +117,17 @@ class GraphAttributeFormat:
         self.position_frame = position_frame
 
 
+class ClothKeypoints:
+    def __init__(self,
+                 keypoint_indices: List[int] = None,
+                 keypoint_edges: List[Tuple[int, int]] = None,
+                 fixed_keypoint_indices: List[int] = None):
+        self.indices = keypoint_indices
+        self.edges = keypoint_edges
+        self.fixed_indices = fixed_keypoint_indices
+        self.fixed_indices_positions = [self.indices.index(keypoint_index) for keypoint_index in self.fixed_indices]
+
+
 class NodeActivationFunction(Enum):
     """
     Node activation function on a graph network.
@@ -146,6 +157,17 @@ class GraphNetStructure:
         self.core_global_layers = core_global_layers
         self.num_processing_steps = num_processing_steps
         self.node_activation_function = node_activation_function
+
+
+class TrainingParams:
+    def __init__(self,
+                 frame_step: int = 1,
+                 movement_threshold: float = 0.001,
+                 batch_size: int = 32,
+                 ):
+        self.frame_step = frame_step
+        self.movement_threshold = movement_threshold
+        self.batch_size = batch_size
 
 
 def snt_mlp(layers):
@@ -201,17 +223,23 @@ class ModelSpecification:
     """
 
     def __init__(self,
+                 name: str = None,
                  input_graph_format: GraphAttributeFormat = None,
                  output_graph_format: GraphAttributeFormat = None,
-                 graph_net_structure: GraphNetStructure = None
+                 graph_net_structure: GraphNetStructure = None,
+                 cloth_keypoints: ClothKeypoints = None,
+                 training_params: TrainingParams = None,
                  ):
+        self.name = name
         self.input_graph_format = input_graph_format
         self.output_graph_format = output_graph_format
         self.graph_net_structure = graph_net_structure
+        self.cloth_keypoints = cloth_keypoints
+        self.training_params = training_params
 
-    def create_graph_net(self, name):
+    def create_graph_net(self):
         return GraphNetworkModules.EncodeProcessDecode(
-            name=name,
+            name=self.name,
             make_encoder_edge_model=snt_mlp(self.graph_net_structure.encoder_edge_layers),
             make_encoder_node_model=snt_mlp(self.graph_net_structure.encoder_node_layers),
             make_encoder_global_model=snt_mlp(self.graph_net_structure.encoder_global_layers),
