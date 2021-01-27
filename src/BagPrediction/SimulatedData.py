@@ -32,6 +32,7 @@ class Frame:
         self.frame_index = frame_index
         self.num_rigid = self.data.dataset[RIGID_NUM_KEY][self.scenario_index]
         self.overwritten_keypoint_pos = None
+        self.overwritten_rigid_body_pos = None
 
     def get_cloth_keypoint_positions(self, indices):
         mesh_vertices = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
@@ -39,6 +40,9 @@ class Frame:
 
     def overwrite_keypoint_positions(self, keypoint_positions: np.array):
         self.overwritten_keypoint_pos = keypoint_positions
+
+    def overwrite_rigid_body_positions(self, rigid_body_positions: np.array):
+        self.overwritten_rigid_body_pos = rigid_body_positions
 
     def get_cloth_keypoint_info(self, indices, fix_indices):
         mesh_frame = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
@@ -86,7 +90,9 @@ class Frame:
         return mesh_vertices
 
     def get_rigid_keypoint_info(self):
-        rigid_vertices = self.data.dataset[RIGID_KEY][self.scenario_index][self.frame_index][:self.num_rigid,:]
+        rigid_vertices = np.copy(self.data.dataset[RIGID_KEY][self.scenario_index][self.frame_index][:self.num_rigid,:])
+        if self.overwritten_rigid_body_pos is not None:
+            rigid_vertices[:, :3] = self.overwritten_rigid_body_pos
         inversedense = np.ones((rigid_vertices.shape[0],1)) #  * 100
         rigid_vertices = np.hstack((rigid_vertices, inversedense))
         return rigid_vertices
