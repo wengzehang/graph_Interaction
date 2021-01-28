@@ -137,7 +137,7 @@ class ModelTrainer:
 
                 self.state.best_metrics_tr = metrics_tr
                 self.state.best_metrics_val = metrics_val
-                with open(self.state_path) as file:
+                with open(self.state_path, 'wb') as file:
                     pickle.dump(self.state, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     def train_epoch(self):
