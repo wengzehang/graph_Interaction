@@ -28,14 +28,8 @@ class TrainingState:
         self.best_metrics_val = best_metrics_val
 
 
-class ModelTrainer:
-    def __init__(self,
-                 model: ModelSpecification = None,
-                 train_path_to_topodict: str = None,
-                 train_path_to_dataset: str = None,
-                 valid_path_to_topodict: str = None,
-                 valid_path_to_dataset: str = None):
-
+class ModelLoader:
+    def __init__(self, model: ModelSpecification = None):
         model_path = os.path.join("./models/", model.name)
         self.model_path = model_path
 
@@ -50,28 +44,25 @@ class ModelTrainer:
             self.state = TrainingState(model)
 
         self.model = self.state.model
+        self.net = None
+        self.compiled_update_step = None
+        self.compiled_compute_outputs = None
+        self.checkpoint_save_prefix = None
+        self.checkpoint = None
 
-        # Load dataset
-        train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
-        valid_data = SimulatedData.SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
-
-        # Generators which transform the dataset into graphs for training the network
-        self.train_generator = ModelDataGenerator.DataGenerator(train_data, model, training=True)
-        self.valid_generator = ModelDataGenerator.DataGenerator(valid_data, model, training=False)
-
+    def initialize_graph_net(self, example_input_data, example_target_data):
         # We create the graph network and loss function based on the model specification
-        net = model.create_graph_net()
-        self.net = net
-        loss_function = model.loss_function.create()
+        self.net = self.model.create_graph_net()
+        loss_function = self.model.loss_function.create()
 
-        batch_size = model.training_params.batch_size
-        learning_rate = model.training_params.learning_rate
+        batch_size = self.model.training_params.batch_size
+        learning_rate = self.model.training_params.learning_rate
         optimizer = snt.optimizers.Adam(learning_rate)
 
-        num_processing_steps = model.graph_net_structure.num_processing_steps
+        num_processing_steps = self.model.graph_net_structure.num_processing_steps
 
         def net_compute_outputs(inputs, targets):
-            outputs = net(inputs)
+            outputs = self.net(inputs)
             losses_per_processing_step = loss_function(targets, outputs)
             loss = tf.math.reduce_sum(losses_per_processing_step) / num_processing_steps
 
@@ -81,41 +72,70 @@ class ModelTrainer:
             with tf.GradientTape() as tape:
                 outputs, loss = net_compute_outputs(inputs, targets)
 
-            gradients = tape.gradient(loss, net.trainable_variables)
-            optimizer.apply(gradients, net.trainable_variables)
+            gradients = tape.gradient(loss, self.net.trainable_variables)
+            optimizer.apply(gradients, self.net.trainable_variables)
 
             return outputs, loss
 
-        # Get some example data that resembles the tensors that will be fed into update_step():
-        example_input_data, example_target_data, _ = self.train_generator.next_batch(batch_size=batch_size)
-
         # Get the input signature for that function by obtaining the specs
-        input_signature = [
-            utils_tf.specs_from_graphs_tuple(example_input_data),
-            utils_tf.specs_from_graphs_tuple(example_target_data)
-        ]
+        if example_input_data is not None and example_target_data is not None:
+            input_signature = [
+                utils_tf.specs_from_graphs_tuple(example_input_data),
+                utils_tf.specs_from_graphs_tuple(example_target_data)
+            ]
+            # Compile the update function using the input signature for speedy code.
+            self.compiled_update_step = tf.function(net_update_step, input_signature=input_signature)
 
-        # Compile the update function using the input signature for speedy code.
-        self.compiled_update_step = tf.function(net_update_step, input_signature=input_signature)
         self.compiled_compute_outputs = tf.function(net_compute_outputs, experimental_relax_shapes=True)
 
         # Checkpoint setup
-        checkpoint_root = os.path.join(model_path, "checkpoints")
+        checkpoint_root = os.path.join(self.model_path, "checkpoints")
         checkpoint_name = "checkpoint"
         self.checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
 
         # Make sure the model path exists
-        if not os.path.exists(model_path):
-            os.makedirs(model_path)
+        if not os.path.exists(self.model_path):
+            os.makedirs(self.model_path)
 
         # TODO: Allow loading a specific checkpoint?
-        self.checkpoint = tf.train.Checkpoint(module=net)
+        self.checkpoint = tf.train.Checkpoint(module=self.net)
         latest = tf.train.latest_checkpoint(checkpoint_root)
         if latest is not None:
             print("Loading latest checkpoint: ", latest)
             self.checkpoint.restore(latest)
         else:
             print("No checkpoint found. Beginning training from scratch.")
+
+    def save_state(self):
+        self.checkpoint.save(self.checkpoint_save_prefix)
+
+        with open(self.state_path, 'wb') as file:
+            pickle.dump(self.state, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+class ModelTrainer(ModelLoader):
+    def __init__(self,
+                 model: ModelSpecification = None,
+                 train_path_to_topodict: str = None,
+                 train_path_to_dataset: str = None,
+                 valid_path_to_topodict: str = None,
+                 valid_path_to_dataset: str = None):
+
+        super().__init__(model)
+
+        # Load dataset
+        train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
+        valid_data = SimulatedData.SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
+
+        # Generators which transform the dataset into graphs for training the network
+        self.train_generator = ModelDataGenerator.DataGenerator(train_data, model, training=True)
+        self.valid_generator = ModelDataGenerator.DataGenerator(valid_data, model, training=False)
+
+        # Get some example data that resembles the tensors that will be fed into update_step():
+        batch_size = self.model.training_params.batch_size
+        example_input_data, example_target_data, _ = self.train_generator.next_batch(batch_size=batch_size)
+
+        super().initialize_graph_net(example_input_data, example_target_data)
 
     def train(self):
 
@@ -132,13 +152,11 @@ class ModelTrainer:
             if loss_val < min_validation_loss:
                 print("Saving new checkpoint since validation loss has decreased.",
                       "Before:", min_validation_loss, "After:", loss_val)
-                self.checkpoint.save(self.checkpoint_save_prefix)
                 min_validation_loss = loss_val
-
                 self.state.best_metrics_tr = metrics_tr
                 self.state.best_metrics_val = metrics_val
-                with open(self.state_path, 'wb') as file:
-                    pickle.dump(self.state, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+                super().save_state()
 
     def train_epoch(self):
         batch_size = self.model.training_params.batch_size
