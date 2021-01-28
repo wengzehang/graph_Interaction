@@ -41,6 +41,7 @@ class ModelTrainer:
 
         self.state_path = os.path.join(model_path, "state.pickle")
         if os.path.exists(self.state_path):
+            print("State file exists:", self.state_path)
             # Model has already been created/trained ==> load state from file
             with open(self.state_path, 'rb') as file:
                 self.state = pickle.load(file)
