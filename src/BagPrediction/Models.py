@@ -1,5 +1,5 @@
 from ModelSpecification import NodeFormat, EdgeFormat, GlobalFormat, PositionFrame, \
-    GraphAttributeFormat, GraphNetStructure, ModelSpecification, ClothKeypoints, TrainingParams
+    GraphAttributeFormat, GraphNetStructure, ModelSpecification, ClothKeypoints, TrainingParams, LossFunction
 
 
 # Define a model specification which can be instantiated
@@ -110,6 +110,7 @@ def specify_motion_model(name: str) -> ModelSpecification:
         output_graph_format=specify_position_output_graph_format(),
         position_frame=PositionFrame.LocalToEndEffector,
         graph_net_structure=specify_graph_net_structure(),
+        loss_function=LossFunction.MeanSquaredError_Position_NodesOnly,
         cloth_keypoints=specify_cloth_keypoints_for_bag(),
         training_params=specify_training_params(),
     )
@@ -122,6 +123,7 @@ def specify_has_moved_model(name: str) -> ModelSpecification:
         output_graph_format=specify_has_moved_output_graph_format(),
         position_frame=PositionFrame.LocalToEndEffector,
         graph_net_structure=specify_graph_net_structure(),
+        loss_function=LossFunction.CrossEntropy,
         cloth_keypoints=specify_cloth_keypoints_for_bag(),
         training_params=specify_training_params(),
     )
