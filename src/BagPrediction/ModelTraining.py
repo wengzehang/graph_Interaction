@@ -4,7 +4,7 @@ Training a model given by a specification
 
 import SimulatedData
 import Models
-from ModelSpecification import ModelSpecification
+from ModelSpecification import ModelSpecification, LossFunction
 import ModelDataGenerator
 
 from graph_nets import utils_tf
@@ -13,7 +13,19 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
+import pickle
 import os
+
+
+class TrainingState:
+    def __init__(self,
+                 model: ModelSpecification = None,
+                 best_metrics_tr: dict = None,
+                 best_metrics_val: dict = None
+                 ):
+        self.model = model
+        self.best_metrics_tr = best_metrics_tr
+        self.best_metrics_val = best_metrics_val
 
 
 class ModelTrainer:
@@ -24,7 +36,19 @@ class ModelTrainer:
                  valid_path_to_topodict: str = None,
                  valid_path_to_dataset: str = None):
 
-        self.model = model
+        model_path = os.path.join("./models/", model.name)
+        self.model_path = model_path
+
+        self.state_path = os.path.join(model_path, "state.pickle")
+        if os.path.exists(self.state_path):
+            # Model has already been created/trained ==> load state from file
+            with open(self.state_path, 'rb') as file:
+                self.state = pickle.load(file)
+        else:
+            # Model is new ==> create new state to save later
+            self.state = TrainingState(model)
+
+        self.model = self.state.model
 
         # Load dataset
         train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
@@ -75,7 +99,6 @@ class ModelTrainer:
         self.compiled_compute_outputs = tf.function(net_compute_outputs, experimental_relax_shapes=True)
 
         # Checkpoint setup
-        model_path = os.path.join("./models/", model.name)
         checkpoint_root = os.path.join(model_path, "/checkpoints")
         checkpoint_name = "checkpoint"
         self.checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
@@ -93,10 +116,36 @@ class ModelTrainer:
         else:
             print("No checkpoint found. Beginning training from scratch.")
 
-        # TODO: Save model specification as pickle file into the models path
+    def train(self):
+
+        # Recover last minimal validation loss
+        min_validation_loss = 1.0e10
+        if self.state.best_metrics_val is not None:
+            min_validation_loss = self.state.best_metrics_val["loss"]
+
+        # TODO: Do some early stopping if the validation loss has not decreased for n epochs?
+        while True:
+            metrics_tr, metrics_val = self.train_epoch()
+
+            loss_val = metrics_val["loss"]
+            if loss_val < min_validation_loss:
+                print("Saving new checkpoint since validation loss has decreased.",
+                      "Before:", min_validation_loss, "After:", loss_val)
+                self.checkpoint.save(self.checkpoint_save_prefix)
+                min_validation_loss = loss_val
+
+                self.state.best_metrics_tr = metrics_tr
+                self.state.best_metrics_val = metrics_val
+                with open(self.state_path) as file:
+                    pickle.dump(self.state, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     def train_epoch(self):
-        batch_size = model.training_params.batch_size
+        batch_size = self.model.training_params.batch_size
+
+        compute_accuracy = self.model.loss_function == LossFunction.CrossEntropy
+
+        train_accuracy = tf.keras.metrics.Accuracy()
+        valid_accuracy = tf.keras.metrics.Accuracy()
 
         # Training set
         losses_tr = []
@@ -109,14 +158,17 @@ class ModelTrainer:
 
             losses_tr.append(loss_tr.numpy())
 
-            print("Training Loss:", loss_tr.numpy())
-            # TODO: Compute additional metrics like accuracy
-            # train_accuracy.update_state(tf.argmax(targets_tr.nodes, axis=1),
-            #                            tf.argmax(outputs_tr[-1].nodes, axis=1))
+            # print("Training Loss:", loss_tr.numpy())
+            if compute_accuracy:
+                train_accuracy.update_state(tf.argmax(targets_tr.nodes, axis=1),
+                                            tf.argmax(outputs_tr[-1].nodes, axis=1))
 
         epoch = self.train_generator.epoch_count
-        mean_loss_tr = np.mean(losses_tr)
-        print("Epoch ", epoch, " Training Loss:", mean_loss_tr)
+
+        metrics_tr = {"loss": np.mean(losses_tr)}
+        if compute_accuracy:
+            metrics_tr["accuracy"] = train_accuracy.result().numpy()
+        print("Epoch", epoch, "Training:", metrics_tr)
 
         # Compute metrics on validation set
         losses_val = []
@@ -128,11 +180,16 @@ class ModelTrainer:
             outputs_val, loss_val = self.compiled_compute_outputs(inputs_val, targets_val)
 
             losses_val.append(loss_val.numpy())
-            # TODO: Compute additional metrics like accuracy
-            # valid_accuracy.update_state(tf.argmax(targets_val.nodes, axis=1), tf.argmax(outputs_val[-1].nodes, axis=1))
+            if compute_accuracy:
+                valid_accuracy.update_state(tf.argmax(targets_val.nodes, axis=1),
+                                            tf.argmax(outputs_val[-1].nodes, axis=1))
 
-        mean_loss_val = np.mean(losses_val)
-        print("Epoch ", epoch, " Validation Loss:", mean_loss_val)
+        metrics_val = {"loss": np.mean(losses_val)}
+        if compute_accuracy:
+            metrics_val["accuracy"] = valid_accuracy.result().numpy()
+        print("Epoch", epoch, "Validation:", metrics_val)
+
+        return metrics_tr, metrics_val
 
 
 
@@ -141,6 +198,8 @@ class ModelTrainer:
 
 # Specification of the model which we want to train
 model = Models.specify_motion_model("MotionModel")
+
+masked_model = Models.specify_has_moved_model("MaskModel")
 # For frame-wise prediction set frame_step to 1
 # For long horizon prediction choose a value > 1
 model.training_params.frame_step = 1
@@ -159,6 +218,6 @@ trainer = ModelTrainer(model=model,
                        valid_path_to_dataset='h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5',
                        )
 
-trainer.train_epoch()
+trainer.train()
 
 

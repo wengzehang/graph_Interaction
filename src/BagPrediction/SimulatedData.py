@@ -18,6 +18,8 @@ RIGID_KEY = 'posRigid'
 CLOTH_ID_KEY = 'clothid'
 RIGID_NUM_KEY = 'numRigid'
 EFFECTOR_KEY = 'posEffector'
+GRASPED_INDEX_LEFT = 'graspind_l' # Probably the moving hand in the circular motion datasets
+GRASPED_INDEX_RIGHT = 'graspind_r'
 
 
 class Frame:
