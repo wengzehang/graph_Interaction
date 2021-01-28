@@ -134,9 +134,8 @@ class DataGenerator:
                                                                    node_data_current, node_data_next)
 
         output_edge_format = self.specification.input_graph_format.edge_format
-        output_edge_features = output_edge_format.compute_features(positions_next,
-                                                                   self.keypoint_edges_from,
-                                                                   self.keypoint_edges_to)
+        output_edge_features = output_edge_format.compute_features(node_data_next,
+                                                                   self.keypoint_edges_from, self.keypoint_edges_to)
 
         # Add input noise to the position data (only during training)
         positions_current = node_data_current[:, :3]

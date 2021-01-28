@@ -9,7 +9,6 @@ def specify_input_graph_format() -> GraphAttributeFormat:
         node_format=NodeFormat.XYZR_FixedFlag,
         edge_format=EdgeFormat.DiffXYZ_ConnectionFlag,
         global_format=GlobalFormat.NextEndEffectorXYZR,
-        position_frame=PositionFrame.LocalToEndEffector,
     )
 
 

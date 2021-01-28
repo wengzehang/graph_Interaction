@@ -91,7 +91,9 @@ class EdgeFormat(Enum):
         else:
             return result
 
-    def compute_features(self, positions: np.array, keypoint_edges_to, keypoint_edges_from) -> np.array:
+    def compute_features(self, node_data: np.array, keypoint_edges_to, keypoint_edges_from) -> np.array:
+        positions = node_data[:, :3]
+
         num_nodes = positions.shape[0]
         # A fully connected graph has #nodes^2 edges
         num_edges = num_nodes * num_nodes
@@ -99,6 +101,8 @@ class EdgeFormat(Enum):
         edge_index = [i for i in itertools.product(np.arange(num_nodes), repeat=2)]
         # all connected, bidirectional
         node_edges_to, node_edges_from = list(zip(*edge_index))
+        node_edges_to = list(node_edges_to)
+        node_edges_from = list(node_edges_from)
 
         # The distance between adjacent nodes are the edges
         diff_xyz_connected = np.zeros((num_edges, 4), np.float32)  # DISTANCE 3D, CONNECTION TYPE 1.
@@ -150,9 +154,9 @@ class GlobalFormat(Enum):
         effector_position_diff = effector_xyzr_next[:3] - effector_xyzr_current[:3]
         effector_radius = effector_xyzr_current[3]
 
-        if self == ModelSpecification.GlobalFormat.Dummy:
+        if self == GlobalFormat.Dummy:
             features = np.zeros(1, np.float32)
-        elif self == ModelSpecification.GlobalFormat.NextEndEffectorXYZR:
+        elif self == GlobalFormat.NextEndEffectorXYZR:
             features = np.zeros(4, np.float32)
             features[:3] = effector_position_diff
             features[3] = effector_radius
