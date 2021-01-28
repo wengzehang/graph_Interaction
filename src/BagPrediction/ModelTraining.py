@@ -47,8 +47,8 @@ class ModelTrainer:
 
         def net_compute_outputs(inputs, targets):
             outputs = net(inputs)
-            loss = loss_function(targets, outputs[-1])
-            loss = tf.math.reduce_sum(loss) / num_processing_steps
+            losses_per_processing_step = loss_function(targets, outputs)
+            loss = tf.math.reduce_sum(losses_per_processing_step) / num_processing_steps
 
             return outputs, loss
 
