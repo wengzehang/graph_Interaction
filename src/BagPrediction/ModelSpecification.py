@@ -229,17 +229,63 @@ class GraphNetStructure:
         self.node_activation_function = node_activation_function
 
 
+def loss_mse_position_nodes_only(target, outputs):
+    losses = [
+        tf.compat.v1.losses.mean_squared_error(target.nodes[:, :3], output.nodes[:, :3])
+        for output in outputs
+    ]
+    return tf.stack(losses)
+
+
+def loss_mse_position_nodes_and_edges(target, outputs):
+    losses = [
+        tf.compat.v1.losses.mean_squared_error(target.nodes[:, :3], output.nodes[:, :3]) +
+        tf.compat.v1.losses.mean_squared_error(target.edges[:, :3], output.edges[:, :3])
+        for output in outputs
+    ]
+    return tf.stack(losses)
+
+
+def loss_crossentropy(targets, outputs):
+    cce = tf.keras.losses.CategoricalCrossentropy()
+    losses = [
+        cce(targets.nodes, output.nodes)
+        for output in outputs
+    ]
+    return tf.stack(losses)
+
+
+class LossFunction(Enum):
+
+    MeanSquaredError_Position_NodesOnly = 0
+    MeanSquaredError_Position_NodesAndEdges = 1
+
+    CrossEntropy = 10
+
+    def create(self):
+        if self == LossFunction.MeanSquaredError_Position_NodesOnly:
+            return loss_mse_position_nodes_only
+        elif self == LossFunction.MeanSquaredError_Position_NodesAndEdges:
+            return loss_mse_position_nodes_and_edges
+        elif self == LossFunction.CrossEntropy:
+            return loss_crossentropy
+        else:
+            raise NotImplementedError("LossFunction not handled in create()", self)
+
+
 class TrainingParams:
     def __init__(self,
                  frame_step: int = 1,
                  movement_threshold: float = 0.001,
                  batch_size: int = 32,
                  input_noise_stddev: float = 0.002,
+                 learning_rate: float = 1.0e-4
                  ):
         self.frame_step = frame_step
         self.movement_threshold = movement_threshold
         self.batch_size = batch_size
         self.input_noise_stddev = input_noise_stddev
+        self.learning_rate = 1.0e-4
 
 
 def snt_mlp(layers):
@@ -276,10 +322,10 @@ class ModelSpecification:
     - convert the network output back into frame data (PredictedFrame)
     - ... (Maybe more)
     TODO: Implement training based on this model specification
-        - a) Implement conversion of input data (SimulatedData) into the desired input graph format
+        - a) Implement conversion of input data (SimulatedData) into the desired input graph format ==> DONE
         - b) Implement conversion of output data (GraphsTuple) into predicted frame (PredictedFrame)
             ==> This is not always possible (Has moved classification)
-        - c) Create an EncodeProcessDecode architecture based on spec
+        - c) Create an EncodeProcessDecode architecture based on spec ==> DONE
         - d) Do training based on spec (Do we need hyper parameters here as well?)
 
     TODO: Implement evaluation based on this model specification
@@ -300,6 +346,7 @@ class ModelSpecification:
                  output_graph_format: GraphAttributeFormat = None,
                  position_frame: PositionFrame = PositionFrame.LocalToEndEffector,
                  graph_net_structure: GraphNetStructure = None,
+                 loss_function: LossFunction = LossFunction.MeanSquaredError_Position_NodesOnly,
                  cloth_keypoints: ClothKeypoints = None,
                  training_params: TrainingParams = None,
                  ):
@@ -308,6 +355,7 @@ class ModelSpecification:
         self.output_graph_format = output_graph_format
         self.position_frame = position_frame
         self.graph_net_structure = graph_net_structure
+        self.loss_function = loss_function
         self.cloth_keypoints = cloth_keypoints
         self.training_params = training_params
 

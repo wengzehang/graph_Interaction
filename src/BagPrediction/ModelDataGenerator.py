@@ -44,20 +44,20 @@ class DataGenerator:
         self.keypoint_edges_from = np.array([keypoint_indices.index(f) for (f, _) in keypoint_edges])
         self.keypoint_edges_to = np.array([keypoint_indices.index(t) for (_, t) in keypoint_edges])
 
-    def next_batch(self, training: bool = True,
-                   batch_size: int = None) -> Tuple:
+    def next_batch(self, batch_size: int = None) -> Tuple:
         if batch_size is None:
             batch_size = self.specification.training_params.batch_size
 
         dataset_size = self.num_samples
-        start_index = random.randint(0, dataset_size - batch_size)
-        end_index = start_index + batch_size
-
-        self.generated_count = self.generated_count + batch_size
-        new_epoch = self.generated_count >= dataset_size
-        if new_epoch:
+        self.generated_count += batch_size
+        if self.generated_count > dataset_size:
             self.indices = shuffle(self.indices)
             self.epoch_count += 1
+            self.generated_count = 0
+            return None, None, True
+
+        start_index = random.randint(0, dataset_size - batch_size)
+        end_index = start_index + batch_size
 
         input_dicts = [None] * batch_size
         target_dicts = [None] * batch_size
@@ -75,7 +75,7 @@ class DataGenerator:
 
         input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple(input_dicts)
         target_graph_tuples = utils_tf.data_dicts_to_graphs_tuple(target_dicts)
-        return input_graph_tuples, target_graph_tuples, new_epoch
+        return input_graph_tuples, target_graph_tuples, False
 
     def create_input_and_target_graph_dict(self,
                                            current_frame: SimulatedData.Frame,
