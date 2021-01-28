@@ -12,6 +12,7 @@ from graph_nets import utils_tf
 import sonnet as snt
 import tensorflow as tf
 import numpy as np
+import tqdm
 
 import pickle
 import os
@@ -147,12 +148,14 @@ class ModelTrainer:
         train_accuracy = tf.keras.metrics.Accuracy()
         valid_accuracy = tf.keras.metrics.Accuracy()
 
+        pbar_tr = tqdm.tqdm(total=self.train_generator.num_samples)
         # Training set
         losses_tr = []
         while True:
             inputs_tr, targets_tr, new_epoch = self.train_generator.next_batch(batch_size=batch_size)
             if new_epoch:
                 break
+            pbar_tr.update(batch_size)
 
             outputs_tr, loss_tr = self.compiled_update_step(inputs_tr, targets_tr)
 
@@ -162,6 +165,7 @@ class ModelTrainer:
             if compute_accuracy:
                 train_accuracy.update_state(tf.argmax(targets_tr.nodes, axis=1),
                                             tf.argmax(outputs_tr[-1].nodes, axis=1))
+        pbar_tr.close()
 
         epoch = self.train_generator.epoch_count
 
@@ -170,12 +174,14 @@ class ModelTrainer:
             metrics_tr["accuracy"] = train_accuracy.result().numpy()
         print("Epoch", epoch, "Training:", metrics_tr)
 
+        pbar_val = tqdm.tqdm(total=self.valid_generator.num_samples)
         # Compute metrics on validation set
         losses_val = []
         while True:
             inputs_val, targets_val, new_epoch = self.valid_generator.next_batch(batch_size=batch_size)
             if new_epoch:
                 break
+            pbar_val.update(batch_size)
 
             outputs_val, loss_val = self.compiled_compute_outputs(inputs_val, targets_val)
 
@@ -183,6 +189,7 @@ class ModelTrainer:
             if compute_accuracy:
                 valid_accuracy.update_state(tf.argmax(targets_val.nodes, axis=1),
                                             tf.argmax(outputs_val[-1].nodes, axis=1))
+        pbar_val.close()
 
         metrics_val = {"loss": np.mean(losses_val)}
         if compute_accuracy:
