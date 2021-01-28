@@ -87,7 +87,7 @@ def specify_graph_net_structure() -> GraphNetStructure:
     return GraphNetStructure(
         encoder_node_layers=[64, 64],
         encoder_edge_layers=[64, 64],
-        encoder_global_layers=[64],
+        encoder_global_layers=[128],
         core_node_layers=[128, 64],
         core_edge_layers=[128, 64],
         core_global_layers=[128],

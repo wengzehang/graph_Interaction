@@ -18,9 +18,10 @@ class NodeFormat(Enum):
     Node attribute format
 
     Dummy: One float is used as a dummy attribute.
-    XYZR: The position (XYZ) and the radius (R) is encoded as node attribute
+    XYZ: The position (XYZ)
+    XYZR: The position (XYZ) and the radius (R)
+    XYZR_FixedFlag: The position (XYZ), the radius (R) and a fixed flag
     HasMovedClasses: Two-class classification result ([1.0 0.0] has not moved, [0.0 1.0] has moved)
-    TODO: What about fixed flags?
     """
     Dummy = 0
 
@@ -73,6 +74,7 @@ class EdgeFormat(Enum):
 
     Dummy: One float is used as a dummy attribute.
     DiffXYZ: Position difference (XYZ) to the adjacent node.
+    DiffXYZ_ConnectionFlag: Position difference (XYZ) and connection flag (indicates physical connection in deformable object)
     """
     Dummy = 0
 
