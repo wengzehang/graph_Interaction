@@ -45,7 +45,8 @@ class NodeFormat(Enum):
         else:
             return result
 
-    def compute_features(self, data: np.array, current_data: np.array, next_data: np.array):
+    def compute_features(self, data: np.array, current_data: np.array, next_data: np.array,
+                         movement_threshold: float):
         if self == NodeFormat.Dummy:
             return np.zeros(data.shape[0], np.float32)
         elif self == NodeFormat.XYZ:
@@ -59,8 +60,8 @@ class NodeFormat(Enum):
             positions_current = current_data[:, :3]
             positions_next = next_data[:, :3]
             positions_diff = np.linalg.norm(positions_next - positions_current, axis=-1).reshape(-1, 1)
-            has_moved = positions_diff > self.movement_threshold
-            has_not_moved = positions_diff <= self.movement_threshold
+            has_moved = positions_diff > movement_threshold
+            has_not_moved = positions_diff <= movement_threshold
             # The has_moved label is [1.0, 0.0] if the node did not move and [0.0, 1.0] if it moved
             has_moved_label = np.hstack((has_not_moved, has_moved)).astype(np.float32)
             return has_moved_label

@@ -128,12 +128,14 @@ class DataGenerator:
         else:
             raise NotImplementedError("Position frame not implemented")
 
+        movement_threshold = self.specification.training_params.movement_threshold
         # Create output node features (before applying noise)
-        output_node_format = self.specification.input_graph_format.node_format
+        output_node_format = self.specification.output_graph_format.node_format
         output_node_features = output_node_format.compute_features(node_data_next,
-                                                                   node_data_current, node_data_next)
+                                                                   node_data_current, node_data_next,
+                                                                   movement_threshold)
 
-        output_edge_format = self.specification.input_graph_format.edge_format
+        output_edge_format = self.specification.output_graph_format.edge_format
         output_edge_features = output_edge_format.compute_features(node_data_next,
                                                                    self.keypoint_edges_from, self.keypoint_edges_to)
 
@@ -147,7 +149,8 @@ class DataGenerator:
         # Create input node features (after applying noise)
         input_node_format = self.specification.input_graph_format.node_format
         input_node_features = input_node_format.compute_features(node_data_current,
-                                                                 node_data_current, node_data_next)
+                                                                 node_data_current, node_data_next,
+                                                                 movement_threshold)
 
         input_edge_format = self.specification.input_graph_format.edge_format
         input_edge_features = input_edge_format.compute_features(positions_current,
