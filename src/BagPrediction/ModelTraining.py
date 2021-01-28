@@ -100,7 +100,7 @@ class ModelTrainer:
         self.compiled_compute_outputs = tf.function(net_compute_outputs, experimental_relax_shapes=True)
 
         # Checkpoint setup
-        checkpoint_root = os.path.join(model_path, "/checkpoints")
+        checkpoint_root = os.path.join(model_path, "checkpoints")
         checkpoint_name = "checkpoint"
         self.checkpoint_save_prefix = os.path.join(checkpoint_root, checkpoint_name)
 
