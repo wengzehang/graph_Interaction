@@ -156,14 +156,14 @@ if __name__ == '__main__':
 
     result = evaluation.evaluate_dataset(dataset)
 
-    filename = "eval_error_%s_%s.csv" % set_name % model_name
+    filename = f"eval_error_{set_name}_{model_name}.csv"
     with open(filename, mode='w') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         # TODO: Also output the rigid body error
         writer.writerow(["keypoint_pos_error_mean", "keypoint_pos_error_stddev"])
         writer.writerow([result.keypoint_pos_error_mean, result.keypoint_pos_error_stddev])
 
-    filename = "eval_horizon_%s_%s.csv" % set_name % model_name
+    filename = f"eval_horizon_{set_name}_{model_name}.csv"
     with open(filename, mode='w') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(["pos_error_mean"])
