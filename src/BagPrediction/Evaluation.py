@@ -140,7 +140,7 @@ if __name__ == '__main__':
 
     args, _ = parser.parse_known_args()
 
-    set_name = args.set
+    set_name = args.set_name
     path_to_topodict = 'h5data/topo_%s.pkl' % set_name
     path_to_dataset = 'h5data/%s_sphere_sphere_f_f_soft_out_scene1_2TO5.h5' % set_name
     dataset = SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
