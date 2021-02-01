@@ -192,7 +192,8 @@ class HasMovedMaskModelFromSpecification(ModelFromSpecification):
 class HorizonModel(PredictionInterface):
     def __init__(self,
                  single_prediction_model: ModelFromSpecification,
-                 horizon_prediction_model: ModelFromSpecification):
+                 horizon_prediction_model: ModelFromSpecification,
+                 start_horizon_frame: int = 1):
 
         # We use a base prediction model for frame-wise prediction
         self.single_prediction_model = single_prediction_model
@@ -200,6 +201,9 @@ class HorizonModel(PredictionInterface):
         self.horizon_prediction_model = horizon_prediction_model
         self.frame_step = horizon_prediction_model.model_loader.model.training_params.frame_step
         assert self.frame_step > 1, "Frame step must be greater than 1 for horizon prediction"
+
+        # Start horizon prediction with this frame
+        self.start_horizon_frame = start_horizon_frame
 
         # The horizon model was trained to predict 'frame_step' into the future
         # We use these predictions as anchor points for the frame-wise prediction
@@ -245,7 +249,7 @@ class HorizonModel(PredictionInterface):
 
         # If we hit an anchor frame directly, we just return it
         anchor_frame_index = anchor_index * self.frame_step
-        if anchor_frame_index == frame.frame_index:
+        if anchor_frame_index >= self.start_horizon_frame and anchor_frame_index == frame.frame_index:
             return anchor_frame
 
         # Otherwise, we use the frame-wise prediction model

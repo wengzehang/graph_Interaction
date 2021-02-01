@@ -122,7 +122,8 @@ def create_prediction_model(model_name: str):
     mask_model_5 = HasMovedMaskModelFromSpecification(motion_model_5,
                                                       has_moved_model_5_spec)
 
-    horizon_model = HorizonModel(mask_model_1, mask_model_5)
+    horizon_model = HorizonModel(mask_model_1, mask_model_5,
+                                 start_horizon_frame=20)
 
     if model_name == "horizon":
         return horizon_model
