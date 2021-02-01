@@ -7,7 +7,6 @@ from PredictionModels import *
 from NewPredictionModels import *
 from SimulatedData import SimulatedData, Scenario, Frame, keypoint_indices
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
@@ -110,7 +109,15 @@ if __name__ == '__main__':
     mask_model_1 = HasMovedMaskModelFromSpecification(motion_model_1,
                                                       has_moved_model_1_spec)
 
-    model = mask_model_1
+    motion_model_5_spec = ModelSpecification.ModelSpecification(name="MotionModel_5")
+    motion_model_5 = MotionModelFromSpecification(motion_model_5_spec)
+    has_moved_model_5_spec = ModelSpecification.ModelSpecification(name="HasMovedModel_5")
+    mask_model_5 = HasMovedMaskModelFromSpecification(motion_model_5,
+                                                      has_moved_model_5_spec)
+
+    horizon_model = HorizonModel(mask_model_1, mask_model_5)
+
+    model = horizon_model
 
     # TODO: Evaluate all scenarios, but for now only do a small amount for faster testing
     eval = Evaluation(model,

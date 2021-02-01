@@ -187,3 +187,66 @@ class HasMovedMaskModelFromSpecification(ModelFromSpecification):
         predicted_pos_rigid[has_moved_rigid] = unmasked_pos_rigid[has_moved_rigid]
 
         return PredictedFrame(predicted_pos_cloth, predicted_pos_rigid)
+
+
+class HorizonModel(PredictionInterface):
+    def __init__(self,
+                 single_prediction_model: ModelFromSpecification,
+                 horizon_prediction_model: ModelFromSpecification):
+
+        # We use a base prediction model for frame-wise prediction
+        self.single_prediction_model = single_prediction_model
+        # And a longer horizon prediction model to reduce accumulation error
+        self.horizon_prediction_model = horizon_prediction_model
+        self.frame_step = horizon_prediction_model.model_loader.model.training_params.frame_step
+        assert self.frame_step > 1, "Frame step must be greater than 1 for horizon prediction"
+
+        # The horizon model was trained to predict 'frame_step' into the future
+        # We use these predictions as anchor points for the frame-wise prediction
+        # Anchor frames are filled in prepare_scenario()
+        self.anchor_frames = []
+
+    def prepare_scenario(self, scenario: SimulatedData.Scenario):
+
+        num_anchor_frames = scenario.num_frames() // self.frame_step
+        anchor_frames = [None] * num_anchor_frames
+
+        current_frame = scenario.frame(0)
+        keypoint_indices = self.horizon_prediction_model.model_loader.model.cloth_keypoints.indices
+        anchor_frames[0] = PredictedFrame(
+            current_frame.get_cloth_keypoint_positions(keypoint_indices),
+            current_frame.get_rigid_keypoint_info()[:, :3])
+        next_frame = scenario.frame(self.frame_step)
+
+        next_effector_position = next_frame.get_effector_pose()[0]
+        prev_predicted_frame = self.horizon_prediction_model.predict_frame(current_frame, next_effector_position)
+
+        for anchor_index in range(1, num_anchor_frames):
+            current_frame = next_frame
+            current_frame.overwrite_keypoint_positions(prev_predicted_frame.cloth_keypoint_positions)
+            current_frame.overwrite_rigid_body_positions(prev_predicted_frame.rigid_body_positions)
+
+            frame_index = anchor_index * self.frame_step
+            next_frame = scenario.frame(frame_index + self.frame_step)
+            next_effector_position = next_frame.get_effector_pose()[0]
+
+            # Evaluate single frame
+            predicted_frame = self.horizon_prediction_model.predict_frame(current_frame, next_effector_position)
+            anchor_frames[anchor_index] = predicted_frame
+
+            prev_predicted_frame = predicted_frame
+
+        self.anchor_frames = anchor_frames
+
+    def predict_frame(self, frame: SimulatedData.Frame, next_effector_position: np.array) -> PredictedFrame:
+
+        anchor_index = frame.frame_index // self.frame_step
+        anchor_frame: PredictedFrame = self.anchor_frames[anchor_index]
+
+        # If we hit an anchor frame directly, we just return it
+        anchor_frame_index = anchor_index * self.frame_step
+        if anchor_frame_index == frame.frame_index:
+            return anchor_frame
+
+        # Otherwise, we use the frame-wise prediction model
+        return self.single_prediction_model.predict_frame(frame, next_effector_position)
