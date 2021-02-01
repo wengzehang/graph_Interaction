@@ -10,6 +10,7 @@ from SimulatedData import SimulatedData, Scenario, Frame, keypoint_indices
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
+import tqdm
 import csv
 
 
@@ -40,8 +41,8 @@ class Evaluation:
         num_scenarios = min(data.num_scenarios, self.max_scenario_index)
         errors = np.zeros(num_scenarios * (data.num_frames - 1))
         error_index = 0
-        for scenario_index in range(num_scenarios):
-            print("Scenario", scenario_index)
+        print("Evaluating statistics about position error")
+        for scenario_index in tqdm.tqdm(range(num_scenarios)):
             scenario = data.scenario(scenario_index)
             self.model.prepare_scenario(scenario)
 
@@ -63,8 +64,9 @@ class Evaluation:
         num_scenarios = min(data.num_scenarios, self.max_scenario_index)
         errors_per_step = np.zeros((data.num_frames - 1, num_scenarios))
         error_index = 0
-        for scenario_index in range(num_scenarios):
-            print("Scenario", scenario_index)
+
+        print("Evaluating horizon position error")
+        for scenario_index in tqdm.tqdm(range(num_scenarios)):
             scenario = data.scenario(scenario_index)
             self.model.prepare_scenario(scenario)
 
