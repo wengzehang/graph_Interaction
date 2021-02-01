@@ -45,6 +45,7 @@ class ModelLoader:
 
         self.model = self.state.model
         self.net = None
+        self.compiled_predict = None
         self.compiled_update_step = None
         self.compiled_compute_outputs = None
         self.checkpoint_save_prefix = None
@@ -60,6 +61,10 @@ class ModelLoader:
         optimizer = snt.optimizers.Adam(learning_rate)
 
         num_processing_steps = self.model.graph_net_structure.num_processing_steps
+
+        def net_predict(inputs):
+            outputs = self.net(inputs)
+            return outputs
 
         def net_compute_outputs(inputs, targets):
             outputs = self.net(inputs)
@@ -87,6 +92,7 @@ class ModelLoader:
             self.compiled_update_step = tf.function(net_update_step, input_signature=input_signature)
 
         self.compiled_compute_outputs = tf.function(net_compute_outputs, experimental_relax_shapes=True)
+        self.compiled_predict = tf.function(net_predict, experimental_relax_shapes=True)
 
         # Checkpoint setup
         checkpoint_root = os.path.join(self.model_path, "checkpoints")

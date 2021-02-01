@@ -200,6 +200,9 @@ class ClothKeypoints:
         self.fixed_indices = fixed_keypoint_indices
         self.fixed_indices_positions = [self.indices.index(keypoint_index) for keypoint_index in self.fixed_indices]
 
+        self.keypoint_edges_from = np.array([keypoint_indices.index(f) for (f, _) in keypoint_edges])
+        self.keypoint_edges_to = np.array([keypoint_indices.index(t) for (_, t) in keypoint_edges])
+
 
 class NodeActivationFunction(Enum):
     """
