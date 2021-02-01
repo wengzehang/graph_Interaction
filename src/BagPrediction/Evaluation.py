@@ -104,9 +104,13 @@ class Evaluation:
 
 
 if __name__ == '__main__':
-    spec = ModelSpecification.ModelSpecification(name="MotionModel_1")
-    motion_model_1 = MotionModelFromSpecification(spec)
-    model = motion_model_1
+    motion_model_1_spec = ModelSpecification.ModelSpecification(name="MotionModel_1")
+    motion_model_1 = MotionModelFromSpecification(motion_model_1_spec)
+    has_moved_model_1_spec = ModelSpecification.ModelSpecification(name="HasMovedModel_1")
+    mask_model_1 = HasMovedMaskModelFromSpecification(motion_model_1,
+                                                      has_moved_model_1_spec)
+
+    model = mask_model_1
 
     # TODO: Evaluate all scenarios, but for now only do a small amount for faster testing
     eval = Evaluation(model,
