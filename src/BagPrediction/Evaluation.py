@@ -9,6 +9,7 @@ from SimulatedData import SimulatedData, Scenario, Frame, keypoint_indices
 
 import matplotlib.pyplot as plt
 import numpy as np
+import argparse
 import csv
 
 
@@ -30,8 +31,7 @@ class Evaluation:
 
     def evaluate_dataset(self, data: SimulatedData) -> EvaluationResult:
 
-        #keypoint_pos_error_mean, keypoint_pos_error_stddev = self.calculate_keypoint_pos_mean_error(data)
-        keypoint_pos_error_mean, keypoint_pos_error_stddev = None, None
+        keypoint_pos_error_mean, keypoint_pos_error_stddev = self.calculate_keypoint_pos_mean_error(data)
         horizon_pos_error_mean = self.calculate_horizon_pos_error(data)
 
         return EvaluationResult(keypoint_pos_error_mean, keypoint_pos_error_stddev, horizon_pos_error_mean)
@@ -102,12 +102,17 @@ class Evaluation:
         return mean_error
 
 
-if __name__ == '__main__':
+def create_prediction_model(model_name: str):
     motion_model_1_spec = ModelSpecification.ModelSpecification(name="MotionModel_1")
     motion_model_1 = MotionModelFromSpecification(motion_model_1_spec)
+    if model_name == "one-stage":
+        return motion_model_1
+
     has_moved_model_1_spec = ModelSpecification.ModelSpecification(name="HasMovedModel_1")
     mask_model_1 = HasMovedMaskModelFromSpecification(motion_model_1,
                                                       has_moved_model_1_spec)
+    if model_name == "two-stage":
+        return mask_model_1
 
     motion_model_5_spec = ModelSpecification.ModelSpecification(name="MotionModel_5")
     motion_model_5 = MotionModelFromSpecification(motion_model_5_spec)
@@ -117,35 +122,49 @@ if __name__ == '__main__':
 
     horizon_model = HorizonModel(mask_model_1, mask_model_5)
 
-    model = horizon_model
+    if model_name == "horizon":
+        return horizon_model
 
-    # TODO: Evaluate all scenarios, but for now only do a small amount for faster testing
-    eval = Evaluation(model,
-                      max_scenario_index=10)
+    raise NotImplementedError("Model name was not handled in create_prediction_model()", model_name)
 
-    dataset_name = "train"
-    if dataset_name == "train":
-        train_path_to_topodict = 'h5data/topo_train.pkl'
-        train_path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
-        dataset = SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
-    else:
-        valid_path_to_topodict = 'h5data/topo_valid.pkl'
-        valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
-        dataset = SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
 
-    result = eval.evaluate_dataset(dataset)
-    print(result.keypoint_pos_error_mean, result.keypoint_pos_error_stddev)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Evaluate a prediction model for deformable bag manipulation')
+    parser.add_argument('--model', help='Specify the model name: one-stage, two-stage, horizon',
+                        default='one-stage')
+    parser.add_argument('--max_scenarios', type=int, default=None)
+    parser.add_argument('--set_name', type=str, default="train")
+    # TODO: Add parameters to choose a different dataset
 
-    print("Frame-wise errors:")
-    print(result.horizon_pos_error_mean)
+    args, _ = parser.parse_known_args()
 
-    filename = "eval_" + dataset_name + "_one-stage-bigger.csv"
+    set_name = args.set
+    path_to_topodict = 'h5data/topo_%s.pkl' % set_name
+    path_to_dataset = 'h5data/%s_sphere_sphere_f_f_soft_out_scene1_2TO5.h5' % set_name
+    dataset = SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
+
+    max_scenarios = args.max_scenarios
+    if max_scenarios is None:
+        max_scenarios = dataset.num_scenarios
+
+    model_name = args.model
+    model = create_prediction_model(model_name)
+
+    evaluation = Evaluation(model, max_scenario_index=max_scenarios)
+
+    result = evaluation.evaluate_dataset(dataset)
+
+    filename = "eval_error_%s_%s.csv" % set_name % model_name
     with open(filename, mode='w') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        writer.writerow(["cloth_pos_error_mean"])
+        # TODO: Also output the rigid body error
+        writer.writerow(["keypoint_pos_error_mean", "keypoint_pos_error_stddev"])
+        writer.writerow([result.keypoint_pos_error_mean, result.keypoint_pos_error_stddev])
+
+    filename = "eval_horizon_%s_%s.csv" % set_name % model_name
+    with open(filename, mode='w') as file:
+        writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(["pos_error_mean"])
         row_count = result.horizon_pos_error_mean.shape[0]
         for i in range(row_count):
             writer.writerow([result.horizon_pos_error_mean[i]])
-
-    plt.bar(range(result.horizon_pos_error_mean.shape[0]), result.horizon_pos_error_mean)
-    plt.show()
