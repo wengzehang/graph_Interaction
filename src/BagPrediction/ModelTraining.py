@@ -25,7 +25,7 @@ elif args.spec == "has_moved":
 else:
     raise NotImplementedError("Model specification is unknown", args.spec)
 
-# Add a suffic for the frame_step to distinguish longer horizon prediction models
+# Add a suffix for the frame_step to distinguish longer horizon prediction models
 model.name = model.name + "_" + str(args.frame_step)
 
 # For frame-wise prediction set frame_step to 1

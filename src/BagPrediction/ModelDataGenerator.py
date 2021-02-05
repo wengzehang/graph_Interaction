@@ -85,7 +85,7 @@ class DataGenerator:
 
         # Cloth object node features
         # Format: Position (XYZ), Radius (R), InverseDense flag (0 if fixed, 1 if movable)
-        cloth_data_current = np.float32(current_frame.get_cloth_keypoint_info(keypoint_indices, fixed_keypoint_indices))
+        cloth_data_current = np.float32(current_frame.get_cloth_keypoint_info(keypoint_indices))
 
         # Rigid object node features
         # Format: Position (XYZ), Radius (R), InverseDense flag (always 1 for movable)
@@ -96,7 +96,7 @@ class DataGenerator:
 
         # Cloth object node features
         # Format: Position (XYZ), Radius (R), InverseDense flag (0 if fixed, 1 if movable)
-        cloth_data_next = np.float32(next_frame.get_cloth_keypoint_info(keypoint_indices, fixed_keypoint_indices))
+        cloth_data_next = np.float32(next_frame.get_cloth_keypoint_info(keypoint_indices))
 
         # Rigid object node features
         # Format: Position (XYZ), Radius (R), InverseDense flag (always 1 for movable)

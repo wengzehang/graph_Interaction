@@ -18,8 +18,10 @@ RIGID_KEY = 'posRigid'
 CLOTH_ID_KEY = 'clothid'
 RIGID_NUM_KEY = 'numRigid'
 EFFECTOR_KEY = 'posEffector'
-GRASPED_INDEX_LEFT = 'graspind_l' # Probably the moving hand in the circular motion datasets
+GRASPED_INDEX_LEFT = 'graspind_l' # The moving hand in the circular motion datasets
 GRASPED_INDEX_RIGHT = 'graspind_r'
+GRASPED_NUM_LEFT = 'graspnum_l'
+GRASPED_NUM_RIGHT = 'graspnum_r'
 
 
 class Frame:
@@ -46,7 +48,19 @@ class Frame:
     def overwrite_rigid_body_positions(self, rigid_body_positions: np.array):
         self.overwritten_rigid_body_pos = rigid_body_positions
 
-    def get_cloth_keypoint_info(self, indices, fix_indices):
+    def get_grasped_indices(self):
+        # Get grasped vertex indices
+        num_grasped_vertices_left = self.data.dataset[GRASPED_NUM_LEFT][self.scenario_index][self.frame_index]
+        grasped_vertex_indices_left = self.data.dataset[GRASPED_INDEX_LEFT][self.scenario_index][self.frame_index]
+        grasped_vertex_indices_left = grasped_vertex_indices_left[:num_grasped_vertices_left]
+
+        num_grasped_vertices_right = self.data.dataset[GRASPED_NUM_RIGHT][self.scenario_index][self.frame_index]
+        grasped_vertex_indices_right = self.data.dataset[GRASPED_INDEX_RIGHT][self.scenario_index][self.frame_index]
+        grasped_vertex_indices_right = grasped_vertex_indices_right[:num_grasped_vertices_right]
+
+        return np.concatenate((grasped_vertex_indices_left, grasped_vertex_indices_right))
+
+    def get_cloth_keypoint_info(self, indices):
         mesh_frame = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
         mesh_vertices = mesh_frame[indices]
         num_keypoints = mesh_vertices.shape[0]
@@ -56,15 +70,13 @@ class Frame:
         if self.overwritten_keypoint_pos is not None:
             mesh_vertices = self.overwritten_keypoint_pos
 
-        inversedense = np.ones((mesh_frame.shape[0],1))
-        inversedense[fix_indices] = 0.0
-        inversedense = inversedense[indices]
+        grasped_vertex_indices = self.get_grasped_indices()
 
-        mesh_vertices = np.hstack((mesh_vertices, keypoint_radius, inversedense))
-        # mesh_vertices = np.hstack((mesh_vertices, keypoint_radius)) #, inversedense))
+        inverse_dense = np.ones((mesh_frame.shape[0],1))
+        inverse_dense[grasped_vertex_indices] = 0.0
+        inverse_dense = inverse_dense[indices]
 
-        # keypoint_undercontrol = np.zeros((num_keypoints, 1))
-        # mesh_vertices = np.hstack((mesh_vertices, keypoint_radius, keypoint_undercontrol))
+        mesh_vertices = np.hstack((mesh_vertices, keypoint_radius, inverse_dense))
         return mesh_vertices
 
     def get_cloth_keypoint_info_partgraph(self, indices, fix_indices):
