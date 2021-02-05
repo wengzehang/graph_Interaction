@@ -60,7 +60,7 @@ else:
 
 # Ensure that the root path for storing model state and checkpoints exists
 if not os.path.exists(models_root_path):
-    os.mkdirs(models_root_path)
+    os.makedirs(models_root_path)
 
 
 trainer = ModelTrainer(model=model,
