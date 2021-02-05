@@ -104,17 +104,27 @@ class DataGenerator:
 
         node_data_next = np.vstack((cloth_data_next, rigid_data_next))
 
+
         # TensorFlow expects float32 values, the dataset contains float64 values
         effector_xyzr_current = np.float32(current_frame.get_effector_pose()).reshape(4)
         effector_xyzr_next = np.float32(next_frame.get_effector_pose()).reshape(4)
 
+        # Get hand positions
+        hand_left_xyz_current = current_frame.get_left_hand_position()
+        hand_left_xyz_next = next_frame.get_left_hand_position()
+        hand_right_xyz_current = current_frame.get_right_hand_position()
+        hand_right_xyz_next = next_frame.get_right_hand_position()
+
         input_global_format = self.specification.input_graph_format.global_format
-        input_global_features = input_global_format.compute_features(effector_xyzr_current,
-                                                                     effector_xyzr_next)
+        input_global_features, current_position = input_global_format.compute_features(
+            effector_xyzr_current, effector_xyzr_next,
+            hand_left_xyz_current, hand_left_xyz_next,
+            hand_right_xyz_current, hand_right_xyz_next)
 
         output_global_format = self.specification.output_graph_format.global_format
-        output_global_features = output_global_format.compute_features(effector_xyzr_current,
-                                                                       effector_xyzr_next)
+        output_global_features, _ = output_global_format.compute_features(effector_xyzr_current, effector_xyzr_next,
+                                                                          hand_left_xyz_current, hand_left_xyz_next,
+                                                                          hand_right_xyz_current, hand_right_xyz_next)
         # Move to ModelSpecification.py?
         position_frame = self.specification.position_frame
         if position_frame == ModelSpecification.PositionFrame.Global:
@@ -122,7 +132,7 @@ class DataGenerator:
             pass
         elif position_frame == ModelSpecification.PositionFrame.LocalToEndEffector:
             # Transform positions to local frame (current effector position)
-            new_origin = effector_xyzr_current[:3]
+            new_origin = current_position
             node_data_current[:, :3] -= new_origin
             node_data_next[:, :3] -= new_origin
         else:

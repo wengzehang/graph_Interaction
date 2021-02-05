@@ -139,13 +139,15 @@ class GlobalFormat(Enum):
     """
     Dummy = 0
     NextEndEffectorXYZR = 10
-    NextHandPositionXYZ = 20
+    NextHandPositionXYZ_Left = 20
+    NextHandPositionXYZ_Right = 21
 
     def size(self):
         switcher = {
             GlobalFormat.Dummy: 1,
             GlobalFormat.NextEndEffectorXYZR: 4,
-            GlobalFormat.NextHandPositionXYZ: 3,
+            GlobalFormat.NextHandPositionXYZ_Left: 3,
+            GlobalFormat.NextHandPositionXYZ_Right: 3,
         }
         result = switcher.get(self, None)
         if result is None:
@@ -153,20 +155,40 @@ class GlobalFormat(Enum):
         else:
             return result
 
-    def compute_features(self, effector_xyzr_current: np.array, effector_xyzr_next: np.array):
-        effector_position_diff = effector_xyzr_next[:3] - effector_xyzr_current[:3]
-        effector_radius = effector_xyzr_current[3]
+    def compute_features(self,
+                         effector_xyzr_current: np.array, effector_xyzr_next: np.array,
+                         hand_left_xyz_current: np.array, hand_left_xyz_next: np.array,
+                         hand_right_xyz_current: np.array, hand_right_xyz_next: np.array
+                         ):
+        current_position = effector_xyzr_current
 
         if self == GlobalFormat.Dummy:
             features = np.zeros(1, np.float32)
         elif self == GlobalFormat.NextEndEffectorXYZR:
+            effector_position_diff = effector_xyzr_next[:3] - effector_xyzr_current[:3]
+            effector_radius = effector_xyzr_current[3]
+
             features = np.zeros(4, np.float32)
             features[:3] = effector_position_diff
             features[3] = effector_radius
+
+            current_position = effector_xyzr_current[:3]
+        elif self == GlobalFormat.NextHandPositionXYZ_Left:
+            position_diff = hand_left_xyz_next - hand_left_xyz_current
+
+            features = position_diff
+
+            current_position = hand_left_xyz_current
+        elif self == GlobalFormat.NextHandPositionXYZ_Right:
+            position_diff = hand_right_xyz_next - hand_right_xyz_current
+
+            features = position_diff
+
+            current_position = hand_right_xyz_current
         else:
             raise NotImplementedError("Global format is not handled:", self)
 
-        return features
+        return features, current_position
 
 
 class PositionFrame(Enum):

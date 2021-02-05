@@ -3,6 +3,7 @@ Training a model given by a specification
 """
 
 import Models
+import ModelSpecification
 from ModelTrainer import ModelTrainer
 import Datasets
 
@@ -13,7 +14,7 @@ parser = argparse.ArgumentParser(description='Train a prediction model for defor
 parser.add_argument('--spec', help='Specify the model specification you want to train: motion, has_moved',
                     default='motion')
 parser.add_argument('--frame_step', type=int, default=1)
-parser.add_argument('--task_index', type=int, default=None)
+parser.add_argument('--task_index', type=int, default=3)
 
 args, _ = parser.parse_known_args()
 
@@ -57,6 +58,17 @@ else:
 
     # Use a separate path to store the models for each task
     models_root_path = f"./models/task-{task.index}/"
+
+    # Adapt model specs to task (store action parameters in global graph features)
+    if task.effector_motion == Datasets.EffectorMotion.Ball:
+        model.input_graph_format.global_format = ModelSpecification.GlobalFormat.NextEndEffectorXYZR
+    elif task.left_hand_motion in [Datasets.HandMotion.Circle, Datasets.HandMotion.Open]:
+        model.input_graph_format.global_format = ModelSpecification.GlobalFormat.NextHandPositionXYZ_Left
+    elif task.right_hand_motion in [Datasets.HandMotion.Circle, Datasets.HandMotion.Open]:
+        model.input_graph_format.global_format = ModelSpecification.GlobalFormat.NextHandPositionXYZ_Right
+    else:
+        raise NotImplementedError("Action encoding for task is not specified")
+
 
 # Ensure that the root path for storing model state and checkpoints exists
 if not os.path.exists(models_root_path):
