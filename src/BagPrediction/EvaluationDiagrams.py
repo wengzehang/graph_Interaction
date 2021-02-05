@@ -101,7 +101,7 @@ def save_horizon_plot(set: dict, filename: str):
     if errors is None:
         return
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(9, 5))
     ax.set_ylabel('Mean Position Error')
 
     x_pos = np.arange(errors.shape[1])
@@ -116,7 +116,7 @@ def save_horizon_plot(set: dict, filename: str):
 
     ax.legend()
     ax.set_ylim(0)
-    ax.set_xlim(0)
+    ax.set_xlim(0, x_pos[-1])
 
     plt.tight_layout()
     plt.savefig(filename)
