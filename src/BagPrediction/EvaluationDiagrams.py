@@ -11,10 +11,12 @@ import csv
 import os
 
 eval_path = "./evaluation/first-dataset"
+plot_stddev_whiskers = False
 
 sets = [
     {"id": "train", "name": "Training"},
-    {"id": "valid", "name": "Validation"}
+    {"id": "valid", "name": "Validation"},
+    {"id": "test", "name": "Test"}
 ]
 
 models = [
@@ -33,6 +35,7 @@ def load_error_stats(set: dict, models: list) -> Tuple[np.array, np.array]:
         full_path = os.path.join(eval_path, filename)
         if not os.path.exists(full_path):
             print("Could not open file:", full_path)
+            return None, None
 
         with open(full_path) as file:
             reader = csv.reader(file, delimiter=',', quotechar='"')
@@ -45,28 +48,88 @@ def load_error_stats(set: dict, models: list) -> Tuple[np.array, np.array]:
     return mean_errors, stddevs
 
 
-for set in sets:
-    # Load errors
-    mean_errors, stddevs = load_error_stats(set, models)
-
-    print("Mean Error:", mean_errors)
-    print("Stddev:", stddevs)
+def save_error_plot(filename):
+    fig, ax = plt.subplots()
+    ax.set_ylabel('Mean Position Error')
 
     model_names = [model['name'] for model in models]
     x_pos = np.arange(len(model_names))
-    fig, ax = plt.subplots()
-    ax.bar(x_pos, mean_errors, yerr=stddevs, align='center', alpha=0.5, ecolor='black', capsize=10)
-    ax.set_ylabel('Predicted Position Error')
+
     ax.set_xticks(x_pos)
     ax.set_xticklabels(model_names)
-    ax.set_title('Predicted Position Error')
-    ax.yaxis.grid(True)
+    ax.set_title(f"Single Frame Prediction: Mean Position Error")
 
-    # Save the figure and show
-    # TODO: Save to a different file for every set
+    for i, set in enumerate(sets):
+        mean_errors, stddevs = load_error_stats(set, models)
+        if mean_errors is None:
+            continue
+
+        pos = x_pos + (i-1) * 0.25
+
+        yerr = stddevs if plot_stddev_whiskers else None
+        ax.bar(pos, mean_errors, width=0.25, yerr=yerr, align='center', alpha=0.5, ecolor='black', capsize=10)
+
+    ax.set_ylim(0)
+
     plt.tight_layout()
-    plt.savefig('bar_plot_with_error_bars.png')
-    plt.show()
+    plt.savefig(filename)
+
+
+def load_horizon_stats(set: dict, models: list) -> np.array:
+    # Load errors
+    errors = [None] * len(models)
+    for i, model in enumerate(models):
+        filename = f"eval_horizon_{set['id']}_{model['id']}.csv"
+        full_path = os.path.join(eval_path, filename)
+        if not os.path.exists(full_path):
+            print("Could not open file:", full_path)
+            return None
+
+        with open(full_path) as file:
+            reader = csv.reader(file, delimiter=',', quotechar='"')
+            rows = [row[0] for row in reader]
+            # The first row contains the column names
+            # We set it to zero (0-frame prediction has 0 error)
+            rows[0] = 0.0
+            errors[i] = rows
+
+    return np.array(errors, np.float32)
+
+
+def save_horizon_plot(set: dict, filename: str):
+    errors = load_horizon_stats(set, models)
+    if errors is None:
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.set_ylabel('Mean Position Error')
+
+    x_pos = np.arange(errors.shape[1])
+
+    model_names = [model['name'] for model in models]
+
+    ax.set_xticks(x_pos)
+    ax.set_title(f"Horizon Prediction: Mean Position Error ({set['name']})")
+
+    for i, frame_errors in enumerate(errors):
+        ax.plot(x_pos, frame_errors, label=model_names[i])
+
+    ax.legend()
+    ax.set_ylim(0)
+    ax.set_xlim(0)
+
+    plt.tight_layout()
+    plt.savefig(filename)
+
+
+plot_path = os.path.join(eval_path, "plot_error_bars.png")
+save_error_plot(plot_path)
+
+for set in sets:
+    plot_path = os.path.join(eval_path, f"plot_horizon_bars_{set['id']}.png")
+    save_horizon_plot(set, plot_path)
+
+plt.show()
 
 
 
