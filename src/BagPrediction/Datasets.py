@@ -10,6 +10,7 @@ import SimulatedData
 from enum import Enum
 import os
 
+
 class BagContent(Enum):
     Empty = 0
     BallInside = 1
@@ -61,6 +62,7 @@ class EffectorMotion(Enum):
         else:
             return result
 
+
 class Subset(Enum):
     Train = 0
     Validation = 1
@@ -93,10 +95,17 @@ class TaskDataset:
         self.right_hand_motion = right_hand_motion
         self.effector_motion = effector_motion
 
-    def filename(self, subset: Subset):
+    def filename(self, subset: Subset) -> str:
         return f"s{self.index}_soft_{self.bag_content.filename()}_" + \
                f"{self.left_hand_motion.filename()}_{self.right_hand_motion.filename()}_" + \
                f"{self.effector_motion.filename()}_{subset.filename()}.h5"
+
+    def path_to_dataset(self, root_path: str, subset: Subset) -> str:
+        return os.path.join(root_path, self.filename(subset))
+
+    def path_to_topodict(self, root_path: str, subset: Subset) -> str:
+        topo_filename = f"topo_{subset.filename()}.pkl"
+        return os.path.join(root_path, topo_filename)
 
 
 s1 = TaskDataset(index=1,
@@ -150,6 +159,14 @@ s12 = TaskDataset(index=12,
 tasks = [
     s1, s3, s5, s6, s7, s9, s11, s12
 ]
+
+
+def get_task_by_index(task_index: int):
+    for task in tasks:
+        if task.index == task_index:
+            return task
+    return None
+
 
 if __name__ == '__main__':
     # Verify that the files for the task datasets exist
