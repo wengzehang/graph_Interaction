@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description='Train a prediction model for defor
 parser.add_argument('--spec', help='Specify the model specification you want to train: motion, has_moved',
                     default='motion')
 parser.add_argument('--frame_step', type=int, default=1)
-parser.add_argument('--task_index', type=int, default=3)
+parser.add_argument('--task_index', type=int, default=None)
 
 args, _ = parser.parse_known_args()
 
@@ -77,10 +77,10 @@ if not os.path.exists(models_root_path):
 
 trainer = ModelTrainer(model=model,
                        models_root_path=models_root_path,
-                       train_path_to_topodict='h5data/topo_train.pkl',
-                       train_path_to_dataset='h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5',
-                       valid_path_to_topodict='h5data/topo_valid.pkl',
-                       valid_path_to_dataset='h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5',
+                       train_path_to_topodict=train_path_to_topodict,
+                       train_path_to_dataset=train_path_to_dataset,
+                       valid_path_to_topodict=valid_path_to_topodict,
+                       valid_path_to_dataset=valid_path_to_dataset,
                        )
 
 trainer.train()

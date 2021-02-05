@@ -63,7 +63,7 @@ class Frame:
     def get_left_hand_position(self) -> np.array:
         grasped_vertex_indices = self.data.dataset[GRASPED_INDEX_LEFT][self.scenario_index][self.frame_index]
         # Which index should we use as the hand position?
-        hand_index = grasped_vertex_indices[6]
+        hand_index = grasped_vertex_indices[5]
 
         mesh_frame = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
         return np.float32(mesh_frame[hand_index])
@@ -71,7 +71,7 @@ class Frame:
     def get_right_hand_position(self) -> np.array:
         grasped_vertex_indices = self.data.dataset[GRASPED_INDEX_RIGHT][self.scenario_index][self.frame_index]
         # Which index should we use as the hand position?
-        hand_index = grasped_vertex_indices[6]
+        hand_index = grasped_vertex_indices[5]
 
         mesh_frame = self.data.dataset[MESH_KEY][self.scenario_index][self.frame_index]
         return np.float32(mesh_frame[hand_index])

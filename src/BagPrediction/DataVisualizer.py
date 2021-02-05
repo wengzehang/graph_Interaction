@@ -7,6 +7,7 @@ import numpy as np
 from typing import List, Union, Tuple
 
 import SimulatedData
+import Datasets
 
 
 class Frame:
@@ -99,6 +100,10 @@ class DataVisualizer:
         color_point = np.full(total_points.shape, np.array([0.0, 0.0, 0.0]))
         for i in self.keypoint_indices:
             color_point[i] = np.array([0.8, 0.0, 0.0])
+        # Highlight grasped keypoints
+        # TODO: We should get these from the loaded data and not hard-code them here
+        color_point[756] = np.array([0.8, 0.8, 0.0])
+        color_point[1069] = np.array([0.0, 0.8, 0.8])
         color_point[self.keypoint_index] = np.array([1.0, 0.0, 0.0])
 
         # color_point[[395, 550, 756, 436, 952, 1082]] = np.array([0.0, 0.8, 0.0])
@@ -245,12 +250,14 @@ class DataVisualizer:
 
 
 if __name__ == '__main__':
-    path_to_topodict = 'h5data/topo_train.pkl'
+    path_to_topodict = 'h5data/tasks/topo_train.pkl'
     # path_to_dataset = 'h5data/train_sphere_sphere_m_r_soft_ballout.h5'
-    path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
+    task = Datasets.s1
+    path_to_dataset = task.path_to_dataset('h5data/tasks/', Datasets.Subset.Train)
+    #path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
     data = SimulatedData.SimulatedData.load(path_to_topodict, path_to_dataset)
 
-    scenario_index = 101
+    scenario_index = 0
     keypoint_indices = SimulatedData.keypoint_indices
     keypoint_edges = SimulatedData.keypoint_edges
     SimulatedData.validate_keypoint_graph(keypoint_indices, keypoint_edges)
