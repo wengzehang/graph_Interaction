@@ -7,6 +7,7 @@ from ModelTrainer import ModelTrainer
 import Datasets
 
 import argparse
+import os
 
 parser = argparse.ArgumentParser(description='Train a prediction model for deformable bag manipulation')
 parser.add_argument('--spec', help='Specify the model specification you want to train: motion, has_moved',
@@ -40,6 +41,8 @@ if args.task_index is None:
 
     valid_path_to_topodict = 'h5data/topo_valid.pkl'
     valid_path_to_dataset = 'h5data/valid_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
+
+    models_root_path = "./models/"
 else:
     tasks_path = "./h5data/tasks"
 
@@ -52,9 +55,16 @@ else:
     valid_path_to_dataset = task.path_to_dataset(tasks_path, Datasets.Subset.Validation)
     valid_path_to_topodict = task.path_to_topodict(tasks_path, Datasets.Subset.Validation)
 
+    # Use a separate path to store the models for each task
+    models_root_path = f"./models/task-{task.index}/"
 
-# TODO: Define a specific output path for the model depending on task_index
+# Ensure that the root path for storing model state and checkpoints exists
+if not os.path.exists(models_root_path):
+    os.mkdirs(models_root_path)
+
+
 trainer = ModelTrainer(model=model,
+                       models_root_path=models_root_path,
                        train_path_to_topodict='h5data/topo_train.pkl',
                        train_path_to_dataset='h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5',
                        valid_path_to_topodict='h5data/topo_valid.pkl',

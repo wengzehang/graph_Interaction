@@ -29,8 +29,11 @@ class TrainingState:
 
 
 class ModelLoader:
-    def __init__(self, model: ModelSpecification = None):
-        model_path = os.path.join("./models/", model.name)
+    def __init__(self,
+                 model: ModelSpecification = None,
+                 models_root_path: str = "./models/"
+                 ):
+        model_path = os.path.join(models_root_path, model.name)
         self.model_path = model_path
 
         self.state_path = os.path.join(model_path, "state.pickle")
@@ -122,12 +125,14 @@ class ModelLoader:
 class ModelTrainer(ModelLoader):
     def __init__(self,
                  model: ModelSpecification = None,
+                 models_root_path: str = "./models/",
                  train_path_to_topodict: str = None,
                  train_path_to_dataset: str = None,
                  valid_path_to_topodict: str = None,
-                 valid_path_to_dataset: str = None):
+                 valid_path_to_dataset: str = None
+                 ):
 
-        super().__init__(model)
+        super().__init__(model, models_root_path)
 
         # Load dataset
         train_data = SimulatedData.SimulatedData.load(train_path_to_topodict, train_path_to_dataset)
