@@ -155,19 +155,27 @@ class ModelTrainer(ModelLoader):
         if self.state.best_metrics_val is not None:
             min_validation_loss = self.state.best_metrics_val["loss"]
 
-        # TODO: Do some early stopping if the validation loss has not decreased for n epochs?
-        while True:
+        # Do early stopping if the validation loss has not decreased for n epochs
+        early_stopping_epochs = self.model.training_params.early_stopping_epochs
+        epochs_without_improvement = 0
+
+        while epochs_without_improvement < early_stopping_epochs:
             metrics_tr, metrics_val = self.train_epoch()
 
             loss_val = metrics_val["loss"]
             if loss_val < min_validation_loss:
-                print("Saving new checkpoint since validation loss has decreased.",
-                      "Before:", min_validation_loss, "After:", loss_val)
+                print("Saving new checkpoint since validation loss has decreased.\n",
+                      "Before:", min_validation_loss, "After:", loss_val,
+                      "Epochs without improvement:", epochs_without_improvement)
                 min_validation_loss = loss_val
                 self.state.best_metrics_tr = metrics_tr
                 self.state.best_metrics_val = metrics_val
 
                 super().save_state()
+
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
 
     def train_epoch(self):
         batch_size = self.model.training_params.batch_size

@@ -285,13 +285,15 @@ class TrainingParams:
                  movement_threshold: float = 0.001,
                  batch_size: int = 32,
                  input_noise_stddev: float = 0.002,
-                 learning_rate: float = 1.0e-4
+                 learning_rate: float = 1.0e-4,
+                 early_stopping_epochs: int = 10,
                  ):
         self.frame_step = frame_step
         self.movement_threshold = movement_threshold
         self.batch_size = batch_size
         self.input_noise_stddev = input_noise_stddev
-        self.learning_rate = 1.0e-4
+        self.learning_rate = learning_rate
+        self.early_stopping_epochs = early_stopping_epochs
 
 
 def snt_mlp(layers):
