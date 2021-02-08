@@ -253,3 +253,24 @@ def validate_keypoint_graph(indices: List[int], edges: List[Tuple[int, int]]):
             print("from:", e_from, "to:", e_to, " from is not in indices")
         if e_to not in indices:
             print("from:", e_from, "to:", e_to, " to is not in indices")
+
+def RandomRotateY_matrix(angle=None):
+    """Rotates node positions around a specific axis by a randomly sampled
+    factor within a given interval.
+    """
+    if angle == None:
+        angle = np.random.uniform(0, 2*np.pi)
+
+    ry_matrix = np.array([[np.cos(angle), 0.0, np.sin(angle)], [0.0, 1.0, 0.0], [-np.sin(angle), 0.0, np.cos(angle)]])
+    return ry_matrix
+
+def RandomRotateY(inputPos, angle=None):
+    """Rotates node positions around a specific axis by a randomly sampled
+    factor within a given interval.
+    """
+
+    if angle == None:
+        angle = np.random.uniform(0, 2*np.pi)
+
+    ry_matrix = np.array([[np.cos(angle), 0.0, np.sin(angle)], [0.0, 1.0, 0.0], [-np.sin(angle), 0.0, np.cos(angle)]])
+    return np.dot(inputPos, ry_matrix)

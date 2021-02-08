@@ -115,6 +115,7 @@ class DataGenerator:
         hand_right_xyz_current = current_frame.get_right_hand_position()
         hand_right_xyz_next = next_frame.get_right_hand_position()
 
+
         input_global_format = self.specification.input_graph_format.global_format
         input_global_features, current_position = input_global_format.compute_features(
             effector_xyzr_current, effector_xyzr_next,
@@ -137,6 +138,21 @@ class DataGenerator:
             node_data_next[:, :3] -= new_origin
         else:
             raise NotImplementedError("Position frame not implemented")
+
+        # Add random rotation to the position data (only during training)
+        # zehang: if we do rotation for the input frame, we also need to rotate the effector future pose,
+        #  and the ground truth, before calculating the edge attribute
+        augment_rotation = self.specification.training_params.augment_rotation
+        if position_frame == ModelSpecification.PositionFrame.LocalToEndEffector and \
+                self.training and augment_rotation == True:
+            # because we set the effector starting point as origin, we do rotation w.r.t. the verticle axis
+            RYMat = SimulatedData.RandomRotateY_matrix()
+            # rotate the effector future pose, the global features
+            input_global_features[:3] = np.dot(input_global_features[:3], RYMat)
+            # rotate the current frame
+            node_data_current[:, :3] = np.dot(node_data_current[:, :3], RYMat)
+            # rotate the output frame
+            node_data_next[:, :3] = np.dot(node_data_next[:, :3], RYMat)
 
         movement_threshold = self.specification.training_params.movement_threshold
         # Create output node features (before applying noise)
