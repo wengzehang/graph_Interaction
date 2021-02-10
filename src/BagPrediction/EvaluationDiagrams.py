@@ -136,7 +136,7 @@ if __name__ == '__main__':
             continue
 
         plot_path = os.path.join(eval_path, "plot_error_bars.png")
-        save_error_plot(plot_path)
+        save_error_plot(eval_path, plot_path)
 
         for subset in Datasets.Subset:
             plot_path = os.path.join(eval_path, f"plot_horizon_bars_{subset.filename()}.png")
