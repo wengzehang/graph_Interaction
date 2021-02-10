@@ -52,7 +52,10 @@ class Evaluation:
 
                 # Evaluate single frame
                 next_effector_position = next_frame.get_effector_pose()[0]
-                predicted_frame = self.model.predict_frame(current_frame, next_effector_position)
+                hand_left_xyz_next = next_frame.get_left_hand_position()
+                hand_right_xyz_next = next_frame.get_right_hand_position()
+                predicted_frame = self.model.predict_frame(current_frame, next_effector_position,
+                                                           hand_left_xyz_next, hand_right_xyz_next)
                 errors[error_index] = self.calculate_keypoint_pos_error(predicted_frame, next_frame)
 
                 error_index += 1
@@ -73,7 +76,10 @@ class Evaluation:
             next_frame = scenario.frame(1)
 
             next_effector_position = next_frame.get_effector_pose()[0]
-            prev_predicted_frame = self.model.predict_frame(current_frame, next_effector_position)
+            hand_left_xyz_next = next_frame.get_left_hand_position()
+            hand_right_xyz_next = next_frame.get_right_hand_position()
+            prev_predicted_frame = self.model.predict_frame(current_frame, next_effector_position,
+                                                            hand_left_xyz_next, hand_right_xyz_next)
             errors_per_step[0][scenario_index] = self.calculate_keypoint_pos_error(prev_predicted_frame, next_frame)
 
             for frame_index in range(1, data.num_frames - 1):
@@ -83,9 +89,12 @@ class Evaluation:
 
                 next_frame = scenario.frame(frame_index + 1)
                 next_effector_position = next_frame.get_effector_pose()[0]
+                hand_left_xyz_next = next_frame.get_left_hand_position()
+                hand_right_xyz_next = next_frame.get_right_hand_position()
 
                 # Evaluate single frame
-                predicted_frame = self.model.predict_frame(current_frame, next_effector_position)
+                predicted_frame = self.model.predict_frame(current_frame, next_effector_position,
+                                                           hand_left_xyz_next, hand_right_xyz_next)
                 errors_per_step[frame_index][scenario_index] = \
                     self.calculate_keypoint_pos_error(predicted_frame, next_frame)
 
