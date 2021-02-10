@@ -32,6 +32,7 @@ class HandMotion(Enum):
     Released = 1
     Open = 2
     Circle = 3
+    Lift = 4
 
     def filename(self):
         switcher = {
@@ -39,6 +40,7 @@ class HandMotion(Enum):
             HandMotion.Released: "r",
             HandMotion.Open: "open",
             HandMotion.Circle: "circle",
+            HandMotion.Lift: "lift"
         }
         result = switcher.get(self, None)
         if result is None:
@@ -160,6 +162,18 @@ s11 = TaskDataset(index=11,
 s12 = TaskDataset(index=12,
                   bag_content=BagContent.Empty,
                   left_hand_motion=HandMotion.Circle,
+                  right_hand_motion=HandMotion.Released,
+                  effector_motion=EffectorMotion.NoBall)
+
+s13 = TaskDataset(index=13,
+                  bag_content=BagContent.BallInside,
+                  left_hand_motion=HandMotion.Lift,
+                  right_hand_motion=HandMotion.Released,
+                  effector_motion=EffectorMotion.NoBall)
+
+s14 = TaskDataset(index=14,
+                  bag_content=BagContent.Empty,
+                  left_hand_motion=HandMotion.Lift,
                   right_hand_motion=HandMotion.Released,
                   effector_motion=EffectorMotion.NoBall)
 
