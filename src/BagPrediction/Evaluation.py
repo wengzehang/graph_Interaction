@@ -144,65 +144,69 @@ if __name__ == '__main__':
     parser.add_argument('--model', help='Specify the model name: one-stage, two-stage, horizon',
                         default='one-stage')
     parser.add_argument('--max_scenarios', type=int, default=None)
-    parser.add_argument('--set_name', type=str, default="train")
+    parser.add_argument('--set_name', type=str, default=None)
     parser.add_argument('--task_index', type=int, default=1)
 
     args, _ = parser.parse_known_args()
 
-    set_name = args.set_name
-
-    if args.task_index is None:
-        # Paths to training and validation datasets (+ topology of the deformable object)
-        path_to_topodict = f'h5data_archive/topo_{set_name}.pkl'
-        path_to_dataset = f'h5data_archive/{set_name}_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
-
-        models_root_path = "./models/"
+    if args.set_name is None:
+        subsets = [s.filename() for s in Datasets.Subset]
     else:
-        tasks_path = "./h5data/tasks"
+        subsets = [args.set_name]
 
-        print("Chosen task:", args.task_index)
-        task = Datasets.get_task_by_index(args.task_index)
+    for set_name in subsets:
+        if args.task_index is None:
+            # Paths to training and validation datasets (+ topology of the deformable object)
+            path_to_topodict = f'h5data_archive/topo_{set_name}.pkl'
+            path_to_dataset = f'h5data_archive/{set_name}_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
 
-        subset = Datasets.Subset.from_name(set_name)
-        if subset is None:
-            raise ValueError(f"Subset with name '{set_name}' is unknown")
+            models_root_path = "./models/"
+        else:
+            tasks_path = "./h5data/tasks"
 
-        path_to_dataset = task.path_to_dataset(tasks_path, subset)
-        path_to_topodict = task.path_to_topodict(tasks_path, subset)
+            print("Chosen task:", args.task_index)
+            task = Datasets.get_task_by_index(args.task_index)
 
-        # Use a separate path to store the models for each task
-        models_root_path = f"./models/task-{task.index}/"
+            subset = Datasets.Subset.from_name(set_name)
+            if subset is None:
+                raise ValueError(f"Subset with name '{set_name}' is unknown")
 
-    dataset = SimulatedData.load(path_to_topodict, path_to_dataset)
+            path_to_dataset = task.path_to_dataset(tasks_path, subset)
+            path_to_topodict = task.path_to_topodict(tasks_path, subset)
 
-    max_scenarios = args.max_scenarios
-    if max_scenarios is None:
-        max_scenarios = dataset.num_scenarios
+            # Use a separate path to store the models for each task
+            models_root_path = f"./models/task-{task.index}/"
 
-    model_name = args.model
-    model = create_prediction_model(model_name)
+        dataset = SimulatedData.load(path_to_topodict, path_to_dataset)
 
-    evaluation = Evaluation(model, max_scenario_index=max_scenarios)
+        max_scenarios = args.max_scenarios
+        if max_scenarios is None:
+            max_scenarios = dataset.num_scenarios
 
-    result = evaluation.evaluate_dataset(dataset)
+        model_name = args.model
+        model = create_prediction_model(model_name)
 
-    evaluation_path = os.path.join(models_root_path, "evaluation")
-    if not os.path.exists(evaluation_path):
-        os.makedirs(evaluation_path)
+        evaluation = Evaluation(model, max_scenario_index=max_scenarios)
 
-    filename = f"error_{set_name}_{model_name}.csv"
-    path = os.path.join(evaluation_path, filename)
-    with open(path, mode='w') as file:
-        writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        # TODO: Also output the rigid body error
-        writer.writerow(["keypoint_pos_error_mean", "keypoint_pos_error_stddev"])
-        writer.writerow([result.keypoint_pos_error_mean, result.keypoint_pos_error_stddev])
+        result = evaluation.evaluate_dataset(dataset)
 
-    filename = f"horizon_{set_name}_{model_name}.csv"
-    path = os.path.join(evaluation_path, filename)
-    with open(path, mode='w') as file:
-        writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        writer.writerow(["pos_error_mean"])
-        row_count = result.horizon_pos_error_mean.shape[0]
-        for i in range(row_count):
-            writer.writerow([result.horizon_pos_error_mean[i]])
+        evaluation_path = os.path.join(models_root_path, "evaluation")
+        if not os.path.exists(evaluation_path):
+            os.makedirs(evaluation_path)
+
+        filename = f"error_{set_name}_{model_name}.csv"
+        path = os.path.join(evaluation_path, filename)
+        with open(path, mode='w') as file:
+            writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            # TODO: Also output the rigid body error
+            writer.writerow(["keypoint_pos_error_mean", "keypoint_pos_error_stddev"])
+            writer.writerow([result.keypoint_pos_error_mean, result.keypoint_pos_error_stddev])
+
+        filename = f"horizon_{set_name}_{model_name}.csv"
+        path = os.path.join(evaluation_path, filename)
+        with open(path, mode='w') as file:
+            writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(["pos_error_mean"])
+            row_count = result.horizon_pos_error_mean.shape[0]
+            for i in range(row_count):
+                writer.writerow([result.horizon_pos_error_mean[i]])
