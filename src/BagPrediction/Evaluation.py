@@ -15,11 +15,15 @@ import os
 
 class EvaluationResult:
     def __init__(self,
-                 keypoint_pos_error_mean: float,
-                 keypoint_pos_error_stddev: float,
+                 cloth_pos_error_mean: float,
+                 cloth_pos_error_stddev: float,
+                 rigid_pos_error_mean: float,
+                 rigid_pos_error_stddev: float,
                  horizon_pos_error_mean: np.array):
-        self.keypoint_pos_error_mean = keypoint_pos_error_mean
-        self.keypoint_pos_error_stddev = keypoint_pos_error_stddev
+        self.cloth_pos_error_mean = cloth_pos_error_mean
+        self.cloth_pos_error_stddev = cloth_pos_error_stddev
+        self.rigid_pos_error_mean = rigid_pos_error_mean
+        self.rigid_pos_error_stddev = rigid_pos_error_stddev
         self.horizon_pos_error_mean = horizon_pos_error_mean
 
 
@@ -31,14 +35,18 @@ class Evaluation:
 
     def evaluate_dataset(self, data: SimulatedData) -> EvaluationResult:
 
-        keypoint_pos_error_mean, keypoint_pos_error_stddev = self.calculate_keypoint_pos_mean_error(data)
+        cloth_pos_error_mean, cloth_pos_error_stddev, rigid_pos_error_mean, rigid_pos_error_stddev = \
+            self.calculate_keypoint_pos_mean_error(data)
         horizon_pos_error_mean = self.calculate_horizon_pos_error(data)
 
-        return EvaluationResult(keypoint_pos_error_mean, keypoint_pos_error_stddev, horizon_pos_error_mean)
+        return EvaluationResult(cloth_pos_error_mean, cloth_pos_error_stddev,
+                                rigid_pos_error_mean, rigid_pos_error_stddev,
+                                horizon_pos_error_mean)
 
     def calculate_keypoint_pos_mean_error(self, data: SimulatedData):
         num_scenarios = min(data.num_scenarios, self.max_scenario_index)
-        errors = np.zeros(num_scenarios * (data.num_frames - 1))
+        cloth_errors = np.zeros(num_scenarios * (data.num_frames - 1))
+        rigid_errors = np.zeros(num_scenarios * (data.num_frames - 1))
         error_index = 0
         print("Evaluating statistics about position error")
         for scenario_index in tqdm.tqdm(range(num_scenarios)):
@@ -56,16 +64,16 @@ class Evaluation:
                 hand_right_xyz_next = next_frame.get_right_hand_position()
                 predicted_frame = self.model.predict_frame(current_frame, next_effector_position,
                                                            hand_left_xyz_next, hand_right_xyz_next)
-                errors[error_index] = self.calculate_keypoint_pos_error(predicted_frame, next_frame)
+                cloth_errors[error_index] = self.calculate_cloth_pos_error(predicted_frame, next_frame)
+                rigid_errors[error_index] = self.calculate_rigid_pos_error(predicted_frame, next_frame)
 
                 error_index += 1
 
-        return np.mean(errors), np.std(errors)
+        return np.mean(cloth_errors), np.std(cloth_errors), np.mean(rigid_errors), np.std(rigid_errors)
 
     def calculate_horizon_pos_error(self, data: SimulatedData):
         num_scenarios = min(data.num_scenarios, self.max_scenario_index)
         errors_per_step = np.zeros((data.num_frames - 1, num_scenarios))
-        error_index = 0
 
         print("Evaluating horizon position error")
         for scenario_index in tqdm.tqdm(range(num_scenarios)):
@@ -80,7 +88,7 @@ class Evaluation:
             hand_right_xyz_next = next_frame.get_right_hand_position()
             prev_predicted_frame = self.model.predict_frame(current_frame, next_effector_position,
                                                             hand_left_xyz_next, hand_right_xyz_next)
-            errors_per_step[0][scenario_index] = self.calculate_keypoint_pos_error(prev_predicted_frame, next_frame)
+            errors_per_step[0][scenario_index] = self.calculate_cloth_pos_error(prev_predicted_frame, next_frame)
 
             for frame_index in range(1, data.num_frames - 1):
                 current_frame = next_frame
@@ -96,16 +104,24 @@ class Evaluation:
                 predicted_frame = self.model.predict_frame(current_frame, next_effector_position,
                                                            hand_left_xyz_next, hand_right_xyz_next)
                 errors_per_step[frame_index][scenario_index] = \
-                    self.calculate_keypoint_pos_error(predicted_frame, next_frame)
+                    self.calculate_cloth_pos_error(predicted_frame, next_frame)
 
                 prev_predicted_frame = predicted_frame
 
         mean_error_per_step = np.mean(errors_per_step, axis=-1)
         return mean_error_per_step
 
-    def calculate_keypoint_pos_error(self, predicted: PredictedFrame, ground_truth: Frame):
+    def calculate_cloth_pos_error(self, predicted: PredictedFrame, ground_truth: Frame):
         pred_keypoint_pos = predicted.cloth_keypoint_positions
         gt_keypoint_pos = ground_truth.get_cloth_keypoint_positions(keypoint_indices)
+
+        errors = np.linalg.norm(gt_keypoint_pos - pred_keypoint_pos, axis=-1)
+        mean_error = np.mean(errors)
+        return mean_error
+
+    def calculate_rigid_pos_error(self, predicted: PredictedFrame, ground_truth: Frame):
+        pred_keypoint_pos = predicted.rigid_body_positions
+        gt_keypoint_pos = ground_truth.get_rigid_keypoint_info()[:, :3]
 
         errors = np.linalg.norm(gt_keypoint_pos - pred_keypoint_pos, axis=-1)
         mean_error = np.mean(errors)
@@ -198,9 +214,10 @@ if __name__ == '__main__':
         path = os.path.join(evaluation_path, filename)
         with open(path, mode='w') as file:
             writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            # TODO: Also output the rigid body error
-            writer.writerow(["keypoint_pos_error_mean", "keypoint_pos_error_stddev"])
-            writer.writerow([result.keypoint_pos_error_mean, result.keypoint_pos_error_stddev])
+            writer.writerow(["cloth_pos_error_mean", "cloth_pos_error_stddev",
+                             "rigid_pos_error_mean", "rigid_pos_error_stddev",])
+            writer.writerow([result.cloth_pos_error_mean, result.cloth_pos_error_stddev,
+                             result.rigid_pos_error_mean, result.rigid_pos_error_stddev])
 
         filename = f"horizon_{set_name}_{model_name}.csv"
         path = os.path.join(evaluation_path, filename)
