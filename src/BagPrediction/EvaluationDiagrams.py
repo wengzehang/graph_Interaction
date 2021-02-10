@@ -137,12 +137,12 @@ if __name__ == '__main__':
             print(f"No evaluation directory found for task {task.index}: {eval_path}")
             continue
 
-        plot_path = os.path.join(eval_path, "plot_error_bars.png")
-        save_error_plot(eval_path, plot_path)
+        plot_filename = "plot_error_bars.png"
+        save_error_plot(eval_path, plot_filename)
 
         for subset in Datasets.Subset:
-            plot_path = os.path.join(eval_path, f"plot_horizon_bars_{subset.filename()}.png")
-            save_horizon_plot(eval_path, subset, plot_path)
+            plot_filename = f"plot_horizon_bars_{subset.filename()}.png"
+            save_horizon_plot(eval_path, subset, plot_filename)
 
 
 
