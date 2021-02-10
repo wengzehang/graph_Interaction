@@ -80,6 +80,13 @@ class Subset(Enum):
         else:
             return result
 
+    @staticmethod
+    def from_name(self, set_name):
+        for subset in Subset:
+            if subset.filename() == set_name:
+                return subset
+        return None
+
 
 class TaskDataset:
     def __init__(self,

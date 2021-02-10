@@ -2,16 +2,15 @@
 Evaluation code for prediction models
 """
 
-from PredictionInterface import PredictionInterface, PredictedFrame
-from PredictionModels import *
 from NewPredictionModels import *
-from SimulatedData import SimulatedData, Scenario, Frame, keypoint_indices
+from SimulatedData import SimulatedData, Frame, keypoint_indices
+import Datasets
 
-import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 import tqdm
 import csv
+import os
 
 
 class EvaluationResult:
@@ -137,13 +136,34 @@ if __name__ == '__main__':
                         default='one-stage')
     parser.add_argument('--max_scenarios', type=int, default=None)
     parser.add_argument('--set_name', type=str, default="train")
-    # TODO: Add parameters to choose a different dataset
+    parser.add_argument('--task_index', type=int, default=None)
 
     args, _ = parser.parse_known_args()
 
     set_name = args.set_name
-    path_to_topodict = 'h5data/topo_%s.pkl' % set_name
-    path_to_dataset = 'h5data/%s_sphere_sphere_f_f_soft_out_scene1_2TO5.h5' % set_name
+
+    if args.task_index is None:
+        # Paths to training and validation datasets (+ topology of the deformable object)
+        path_to_topodict = f'h5data_archive/topo_{set_name}.pkl'
+        path_to_dataset = f'h5data_archive/{set_name}_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
+
+        models_root_path = "./models/"
+    else:
+        tasks_path = "./h5data/tasks"
+
+        print("Chosen task:", args.task_index)
+        task = Datasets.get_task_by_index(args.task_index)
+
+        subset = Datasets.Subset.from_name(set_name)
+        if subset is None:
+            raise ValueError(f"Subset with name '{set_name}' is unknown")
+
+        path_to_dataset = task.path_to_dataset(tasks_path, subset)
+        path_to_topodict = task.path_to_topodict(tasks_path, subset)
+
+        # Use a separate path to store the models for each task
+        models_root_path = f"./models/task-{task.index}/"
+
     dataset = SimulatedData.load(path_to_topodict, path_to_dataset)
 
     max_scenarios = args.max_scenarios
@@ -157,14 +177,18 @@ if __name__ == '__main__':
 
     result = evaluation.evaluate_dataset(dataset)
 
-    filename = f"eval_error_{set_name}_{model_name}.csv"
+    evaluation_path = os.path.join(models_root_path, "evaluation")
+    if not os.path.exists(evaluation_path):
+        os.makedirs(evaluation_path)
+
+    filename = f"error_{set_name}_{model_name}.csv"
     with open(filename, mode='w') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         # TODO: Also output the rigid body error
         writer.writerow(["keypoint_pos_error_mean", "keypoint_pos_error_stddev"])
         writer.writerow([result.keypoint_pos_error_mean, result.keypoint_pos_error_stddev])
 
-    filename = f"eval_horizon_{set_name}_{model_name}.csv"
+    filename = f"horizon_{set_name}_{model_name}.csv"
     with open(filename, mode='w') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(["pos_error_mean"])
