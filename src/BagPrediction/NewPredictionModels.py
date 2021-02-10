@@ -42,9 +42,10 @@ def create_input_graph_dict(specification: ModelSpecification.ModelSpecification
     hand_right_xyz_current = current_frame.get_right_hand_position()
 
     input_global_format = specification.input_graph_format.global_format
-    input_global_features = input_global_format.compute_features(effector_xyzr_current, effector_xyzr_next,
-                                                                 hand_left_xyz_current, hand_left_xyz_next,
-                                                                 hand_right_xyz_current, hand_right_xyz_next)
+    input_global_features, current_position = input_global_format.compute_features(
+        effector_xyzr_current, effector_xyzr_next,
+        hand_left_xyz_current, hand_left_xyz_next,
+        hand_right_xyz_current, hand_right_xyz_next)
 
     # Move to ModelSpecification.py?
     position_frame = specification.position_frame
@@ -53,8 +54,7 @@ def create_input_graph_dict(specification: ModelSpecification.ModelSpecification
         pass
     elif position_frame == ModelSpecification.PositionFrame.LocalToEndEffector:
         # Transform positions to local frame (current effector position)
-        new_origin = effector_xyzr_current[:3]
-        node_data_current[:, :3] -= new_origin
+        node_data_current[:, :3] -= current_position
     else:
         raise NotImplementedError("Position frame not implemented")
 
