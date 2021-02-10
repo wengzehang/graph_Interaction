@@ -261,9 +261,12 @@ class HorizonModel(PredictionInterface):
             frame_index = anchor_index * self.frame_step
             next_frame = scenario.frame(frame_index + self.frame_step)
             next_effector_position = next_frame.get_effector_pose()[0]
+            hand_left_xyz_next = next_frame.get_left_hand_position()
+            hand_right_xyz_next = next_frame.get_right_hand_position()
 
             # Evaluate single frame
-            predicted_frame = self.horizon_prediction_model.predict_frame(current_frame, next_effector_position)
+            predicted_frame = self.horizon_prediction_model.predict_frame(current_frame, next_effector_position,
+                                                                          hand_left_xyz_next, hand_right_xyz_next)
             anchor_frames[anchor_index] = predicted_frame
 
             prev_predicted_frame = predicted_frame
