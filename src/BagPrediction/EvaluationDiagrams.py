@@ -60,7 +60,8 @@ def save_error_plot(eval_path: str, filename: str):
 
     plt.tight_layout()
     path = os.path.join(eval_path, filename)
-    plt.savefig(filename)
+    plt.savefig(path)
+    print("Saved:", path)
 
 
 def load_horizon_stats(eval_path: str, subset: Datasets.Subset, models: list) -> np.array:
@@ -109,6 +110,7 @@ def save_horizon_plot(eval_path: str, subset: Datasets.Subset, filename: str):
     plt.tight_layout()
     path = os.path.join(eval_path, filename)
     plt.savefig(path)
+    print("Saved:", path)
 
 
 if __name__ == '__main__':
@@ -132,7 +134,7 @@ if __name__ == '__main__':
         eval_path = f"./models/task-{task.index}/evaluation"
 
         if not os.path.exists(eval_path):
-            print(f"No evaluation directory found for task {task.index}:\n{eval_path}")
+            print(f"No evaluation directory found for task {task.index}: {eval_path}")
             continue
 
         plot_path = os.path.join(eval_path, "plot_error_bars.png")
