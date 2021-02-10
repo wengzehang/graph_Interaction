@@ -145,7 +145,7 @@ if __name__ == '__main__':
                         default='one-stage')
     parser.add_argument('--max_scenarios', type=int, default=None)
     parser.add_argument('--set_name', type=str, default="train")
-    parser.add_argument('--task_index', type=int, default=None)
+    parser.add_argument('--task_index', type=int, default=1)
 
     args, _ = parser.parse_known_args()
 
@@ -191,14 +191,16 @@ if __name__ == '__main__':
         os.makedirs(evaluation_path)
 
     filename = f"error_{set_name}_{model_name}.csv"
-    with open(filename, mode='w') as file:
+    path = os.path.join(evaluation_path, filename)
+    with open(path, mode='w') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         # TODO: Also output the rigid body error
         writer.writerow(["keypoint_pos_error_mean", "keypoint_pos_error_stddev"])
         writer.writerow([result.keypoint_pos_error_mean, result.keypoint_pos_error_stddev])
 
     filename = f"horizon_{set_name}_{model_name}.csv"
-    with open(filename, mode='w') as file:
+    path = os.path.join(evaluation_path, filename)
+    with open(path, mode='w') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(["pos_error_mean"])
         row_count = result.horizon_pos_error_mean.shape[0]
