@@ -66,7 +66,7 @@ class EffectorMotion(Enum):
 
 
 class Subset(Enum):
-    Train = 0
+    Training = 0
     Validation = 1
     Test = 2
 

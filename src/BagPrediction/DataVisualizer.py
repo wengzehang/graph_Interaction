@@ -253,7 +253,7 @@ if __name__ == '__main__':
     path_to_topodict = 'h5data/tasks/topo_train.pkl'
     # path_to_dataset = 'h5data/train_sphere_sphere_m_r_soft_ballout.h5'
     task = Datasets.s14
-    path_to_dataset = task.path_to_dataset('h5data/tasks/', Datasets.Subset.Train)
+    path_to_dataset = task.path_to_dataset('h5data/tasks/', Datasets.Subset.Training)
     #path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
     data = SimulatedData.SimulatedData.load(path_to_topodict, path_to_dataset)
 

@@ -98,7 +98,7 @@ def save_horizon_plot(eval_path: str, subset: Datasets.Subset, filename: str):
     model_names = [model['name'] for model in models]
 
     ax.set_xticks(x_pos)
-    ax.set_title(f"Horizon Prediction: Mean Position Error ({subset.name()})")
+    ax.set_title(f"Horizon Prediction: Mean Position Error ({subset.name})")
 
     for i, frame_errors in enumerate(errors):
         ax.plot(x_pos, frame_errors, label=model_names[i])
