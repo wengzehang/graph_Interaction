@@ -2,36 +2,23 @@
 Generate diagrams from the evalution data
 """
 
+import Datasets
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 from typing import Tuple
-
+import argparse
 import csv
 import os
 
-eval_path = "./evaluation/first-dataset"
-plot_stddev_whiskers = False
 
-sets = [
-    {"id": "train", "name": "Training"},
-    {"id": "valid", "name": "Validation"},
-    {"id": "test", "name": "Test"}
-]
-
-models = [
-    {"id": "one-stage", "name": "One-step"},
-    {"id": "two-stage", "name": "Two-step"},
-    {"id": "horizon", "name": "Horizon"}
-]
-
-
-def load_error_stats(set: dict, models: list) -> Tuple[np.array, np.array]:
+def load_error_stats(eval_path: str, subset: Datasets.Subset, models: list) -> Tuple[np.array, np.array]:
     # Load errors
     mean_errors = np.zeros(len(models))
     stddevs = np.zeros(len(models))
     for i, model in enumerate(models):
-        filename = f"eval_error_{set['id']}_{model['id']}.csv"
+        filename = f"error_{subset.filename()}_{model['id']}.csv"
         full_path = os.path.join(eval_path, filename)
         if not os.path.exists(full_path):
             print("Could not open file:", full_path)
@@ -48,7 +35,7 @@ def load_error_stats(set: dict, models: list) -> Tuple[np.array, np.array]:
     return mean_errors, stddevs
 
 
-def save_error_plot(filename):
+def save_error_plot(eval_path: str, filename: str):
     fig, ax = plt.subplots()
     ax.set_ylabel('Mean Position Error')
 
@@ -59,8 +46,8 @@ def save_error_plot(filename):
     ax.set_xticklabels(model_names)
     ax.set_title(f"Single Frame Prediction: Mean Position Error")
 
-    for i, set in enumerate(sets):
-        mean_errors, stddevs = load_error_stats(set, models)
+    for i, set in enumerate(Datasets.Subset):
+        mean_errors, stddevs = load_error_stats(eval_path, set, models)
         if mean_errors is None:
             continue
 
@@ -72,14 +59,15 @@ def save_error_plot(filename):
     ax.set_ylim(0)
 
     plt.tight_layout()
+    path = os.path.join(eval_path, filename)
     plt.savefig(filename)
 
 
-def load_horizon_stats(set: dict, models: list) -> np.array:
+def load_horizon_stats(eval_path: str, subset: Datasets.Subset, models: list) -> np.array:
     # Load errors
     errors = [None] * len(models)
     for i, model in enumerate(models):
-        filename = f"eval_horizon_{set['id']}_{model['id']}.csv"
+        filename = f"horizon_{subset.filename()}_{model['id']}.csv"
         full_path = os.path.join(eval_path, filename)
         if not os.path.exists(full_path):
             print("Could not open file:", full_path)
@@ -96,8 +84,8 @@ def load_horizon_stats(set: dict, models: list) -> np.array:
     return np.array(errors, np.float32)
 
 
-def save_horizon_plot(set: dict, filename: str):
-    errors = load_horizon_stats(set, models)
+def save_horizon_plot(eval_path: str, subset: Datasets.Subset, filename: str):
+    errors = load_horizon_stats(eval_path, subset, models)
     if errors is None:
         return
 
@@ -119,17 +107,40 @@ def save_horizon_plot(set: dict, filename: str):
     ax.set_xlim(0, x_pos[-1])
 
     plt.tight_layout()
-    plt.savefig(filename)
+    path = os.path.join(eval_path, filename)
+    plt.savefig(path)
 
 
-plot_path = os.path.join(eval_path, "plot_error_bars.png")
-save_error_plot(plot_path)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Evaluate a prediction model for deformable bag manipulation')
+    parser.add_argument('--plot_stddev_whiskers', type=bool, default=False)
 
-for set in sets:
-    plot_path = os.path.join(eval_path, f"plot_horizon_bars_{set['id']}.png")
-    save_horizon_plot(set, plot_path)
+    args, _ = parser.parse_known_args()
 
-plt.show()
+    plot_stddev_whiskers = args.plot_stddev_whiskers
+
+    models = [
+        {"id": "one-stage", "name": "One-step"},
+        {"id": "two-stage", "name": "Two-step"},
+        {"id": "horizon", "name": "Horizon"}
+    ]
+
+    for task in Datasets.tasks:
+        print("Creating evaluation diagrams for task:", task.index)
+
+        # Use a separate path to store the models for each task
+        eval_path = f"./models/task-{task.index}/evaluation"
+
+        if not os.path.exists(eval_path):
+            print(f"No evaluation directory found for task {task.index}:\n{eval_path}")
+            continue
+
+        plot_path = os.path.join(eval_path, "plot_error_bars.png")
+        save_error_plot(plot_path)
+
+        for subset in Datasets.Subset:
+            plot_path = os.path.join(eval_path, f"plot_horizon_bars_{subset.filename()}.png")
+            save_horizon_plot(eval_path, subset, plot_path)
 
 
 
