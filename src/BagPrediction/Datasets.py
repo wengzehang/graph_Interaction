@@ -72,7 +72,7 @@ class Subset(Enum):
 
     def filename(self):
         switcher = {
-            Subset.Train: "train",
+            Subset.Training: "train",
             Subset.Validation: "valid",
             Subset.Test: "test"
         }
