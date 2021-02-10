@@ -19,11 +19,12 @@ def create_input_graph_dict(specification: ModelSpecification.ModelSpecification
                             effector_xyzr_next: np.array,
                             training: bool = False):
     keypoint_indices = specification.cloth_keypoints.indices
-    fixed_keypoint_indices = specification.cloth_keypoints.fixed_indices
+    # The grasped keypoint indices are now taken from the dataset instead of being hardcoded
+    # fixed_keypoint_indices = specification.cloth_keypoints.fixed_indices
 
     # Cloth object node features
     # Format: Position (XYZ), Radius (R), InverseDense flag (0 if fixed, 1 if movable)
-    cloth_data_current = np.float32(current_frame.get_cloth_keypoint_info(keypoint_indices, fixed_keypoint_indices))
+    cloth_data_current = np.float32(current_frame.get_cloth_keypoint_info(keypoint_indices))
 
     # Rigid object node features
     # Format: Position (XYZ), Radius (R), InverseDense flag (always 1 for movable)
