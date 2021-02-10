@@ -12,11 +12,14 @@ from graph_nets import utils_tf
 
 import numpy as np
 import itertools
+from typing import List
 
 
 def create_input_graph_dict(specification: ModelSpecification.ModelSpecification,
                             current_frame: SimulatedData.Frame,
                             effector_xyzr_next: np.array,
+                            hand_left_xyz_next: np.array,
+                            hand_right_xyz_next: np.array,
                             training: bool = False):
     keypoint_indices = specification.cloth_keypoints.indices
     # The grasped keypoint indices are now taken from the dataset instead of being hardcoded
@@ -35,10 +38,13 @@ def create_input_graph_dict(specification: ModelSpecification.ModelSpecification
 
     # TensorFlow expects float32 values, the dataset contains float64 values
     effector_xyzr_current = np.float32(current_frame.get_effector_pose()).reshape(4)
+    hand_left_xyz_current = current_frame.get_left_hand_position()
+    hand_right_xyz_current = current_frame.get_right_hand_position()
 
     input_global_format = specification.input_graph_format.global_format
-    input_global_features = input_global_format.compute_features(effector_xyzr_current,
-                                                                 effector_xyzr_next)
+    input_global_features = input_global_format.compute_features(effector_xyzr_current, effector_xyzr_next,
+                                                                 hand_left_xyz_current, hand_left_xyz_next,
+                                                                 hand_right_xyz_current, hand_right_xyz_next)
 
     # Move to ModelSpecification.py?
     position_frame = specification.position_frame
@@ -101,15 +107,23 @@ class ModelFromSpecification(PredictionInterface, ABC):
         self.model_loader.model.cloth_keypoints = ModelSpecification.ClothKeypoints(ck.indices, ck.edges,
                                                                                     ck.fixed_indices)
 
-    def create_input_graph_tuples(self, frame: SimulatedData.Frame, next_effector_position: np.array):
+    def create_input_graph_tuples(self, frame: SimulatedData.Frame,
+                                  effector_xyzr_next: np.array,
+                                  hand_left_xyz_next: np.array,
+                                  hand_right_xyz_next: np.array):
         # Prepare input graph tuples
         input_graph_dict = create_input_graph_dict(self.model_loader.model,
-                                                   frame, next_effector_position)
+                                                   frame, effector_xyzr_next,
+                                                   hand_left_xyz_next, hand_right_xyz_next)
         input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([input_graph_dict])
         return input_graph_tuples
 
-    def predict_output_graph_tuples(self, frame: SimulatedData.Frame, next_effector_position: np.array):
-        input_graph_tuples = self.create_input_graph_tuples(frame, next_effector_position)
+    def predict_output_graph_tuples(self, frame: SimulatedData.Frame,
+                                    effector_xyzr_next: np.array,
+                                    hand_left_xyz_next: np.array,
+                                    hand_right_xyz_next: np.array):
+        input_graph_tuples = self.create_input_graph_tuples(frame, effector_xyzr_next,
+                                                            hand_left_xyz_next, hand_right_xyz_next)
 
         # Model prediction
         predicted_graph_tuples = self.model_loader.compiled_predict(input_graph_tuples)
@@ -123,9 +137,14 @@ class MotionModelFromSpecification(ModelFromSpecification):
         assert self.model_loader.model.output_graph_format.node_format == ModelSpecification.NodeFormat.XYZ, \
             "Output node format must be XYZ for the motion model"
 
-    def predict_frame(self, frame: SimulatedData.Frame, next_effector_position: np.array) -> PredictedFrame:
+    def predict_frame(self, frame: SimulatedData.Frame,
+                      effector_xyzr_next: np.array,
+                      hand_left_xyz_next: np.array,
+                      hand_right_xyz_next: np.array
+                      ) -> PredictedFrame:
 
-        predicted_graph_tuples = self.predict_output_graph_tuples(frame, next_effector_position)
+        predicted_graph_tuples = self.predict_output_graph_tuples(frame, effector_xyzr_next,
+                                                                  hand_left_xyz_next, hand_right_xyz_next)
 
         # Convert output graph tuple to PredictFrame
         predicted_nodes = predicted_graph_tuples[-1].nodes.numpy()
@@ -161,14 +180,19 @@ class HasMovedMaskModelFromSpecification(ModelFromSpecification):
         assert output_node_format == ModelSpecification.NodeFormat.HasMovedClasses, \
             "Output node format must be HasMovedClasses for the has_moved mask model"
 
-    def predict_frame(self, frame: SimulatedData.Frame, next_effector_position: np.array) -> PredictedFrame:
+    def predict_frame(self, frame: SimulatedData.Frame,
+                      effector_xyzr_next: np.array,
+                      hand_left_xyz_next: np.array,
+                      hand_right_xyz_next: np.array) -> PredictedFrame:
         # Predict motion without mask
-        motion_prediction = self.motion_model.predict_frame(frame, next_effector_position)
+        motion_prediction = self.motion_model.predict_frame(frame, effector_xyzr_next,
+                                                            hand_left_xyz_next, hand_right_xyz_next)
         unmasked_pos_cloth = motion_prediction.cloth_keypoint_positions
         unmasked_pos_rigid = motion_prediction.rigid_body_positions
 
         # Predict has_moved mask
-        predicted_graph_tuples = self.predict_output_graph_tuples(frame, next_effector_position)
+        predicted_graph_tuples = self.predict_output_graph_tuples(frame, effector_xyzr_next,
+                                                                  hand_left_xyz_next, hand_right_xyz_next)
         predicted_nodes = predicted_graph_tuples[-1].nodes.numpy()
 
         keypoint_indices = self.model_loader.model.cloth_keypoints.indices
@@ -209,7 +233,7 @@ class HorizonModel(PredictionInterface):
         # The horizon model was trained to predict 'frame_step' into the future
         # We use these predictions as anchor points for the frame-wise prediction
         # Anchor frames are filled in prepare_scenario()
-        self.anchor_frames = []
+        self.anchor_frames: List[PredictedFrame] = []
 
     def prepare_scenario(self, scenario: SimulatedData.Scenario):
 
@@ -224,7 +248,10 @@ class HorizonModel(PredictionInterface):
         next_frame = scenario.frame(self.frame_step)
 
         next_effector_position = next_frame.get_effector_pose()[0]
-        prev_predicted_frame = self.horizon_prediction_model.predict_frame(current_frame, next_effector_position)
+        hand_left_xyz_next = next_frame.get_left_hand_position()
+        hand_right_xyz_next = next_frame.get_right_hand_position()
+        prev_predicted_frame = self.horizon_prediction_model.predict_frame(current_frame, next_effector_position,
+                                                                           hand_left_xyz_next, hand_right_xyz_next)
 
         for anchor_index in range(1, num_anchor_frames):
             current_frame = next_frame
@@ -243,7 +270,11 @@ class HorizonModel(PredictionInterface):
 
         self.anchor_frames = anchor_frames
 
-    def predict_frame(self, frame: SimulatedData.Frame, next_effector_position: np.array) -> PredictedFrame:
+    def predict_frame(self, frame: SimulatedData.Frame,
+                      effector_xyzr_next: np.array,
+                      hand_left_xyz_next: np.array,
+                      hand_right_xyz_next: np.array
+                      ) -> PredictedFrame:
 
         anchor_index = frame.frame_index // self.frame_step
         anchor_frame: PredictedFrame = self.anchor_frames[anchor_index]
@@ -254,4 +285,5 @@ class HorizonModel(PredictionInterface):
             return anchor_frame
 
         # Otherwise, we use the frame-wise prediction model
-        return self.single_prediction_model.predict_frame(frame, next_effector_position)
+        return self.single_prediction_model.predict_frame(frame, effector_xyzr_next,
+                                                          hand_left_xyz_next, hand_right_xyz_next)

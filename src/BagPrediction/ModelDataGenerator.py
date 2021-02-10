@@ -81,7 +81,6 @@ class DataGenerator:
                                            current_frame: SimulatedData.Frame,
                                            next_frame: SimulatedData.Frame):
         keypoint_indices = self.specification.cloth_keypoints.indices
-        fixed_keypoint_indices = self.specification.cloth_keypoints.fixed_indices
 
         # Cloth object node features
         # Format: Position (XYZ), Radius (R), InverseDense flag (0 if fixed, 1 if movable)

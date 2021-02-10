@@ -18,12 +18,11 @@ class PredictedFrame:
 
 class PredictionInterface:
 
-    def predict_frame(self, frame: SimulatedData.Frame, next_effector_position: np.array) -> PredictedFrame:
+    def predict_frame(self, frame: SimulatedData.Frame,
+                      effector_xyzr_next: np.array,
+                      hand_left_xyz_next: np.array,
+                      hand_right_xyz_next: np.array) -> PredictedFrame:
         raise NotImplementedError()
-
-    def predict_frame_list(self, frames: List[SimulatedData.Frame]):
-        # Implement batch prediction in implementation if possible
-        return [self.predict_frame(frame) for frame in frames]
 
     def prepare_scenario(self, scenario: SimulatedData.Scenario):
         # This method is used to predict anchor frames with a long horizon model
