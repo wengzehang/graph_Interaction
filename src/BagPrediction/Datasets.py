@@ -81,7 +81,7 @@ class Subset(Enum):
             return result
 
     @staticmethod
-    def from_name(self, set_name):
+    def from_name(set_name):
         for subset in Subset:
             if subset.filename() == set_name:
                 return subset
