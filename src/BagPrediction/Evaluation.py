@@ -131,7 +131,7 @@ def create_prediction_model(model_name: str):
                                                       has_moved_model_5_spec)
 
     horizon_model = HorizonModel(mask_model_1, mask_model_5,
-                                 start_horizon_frame=20)
+                                 start_horizon_frame=1)
 
     if model_name == "horizon":
         return horizon_model
