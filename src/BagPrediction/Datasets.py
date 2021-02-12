@@ -178,7 +178,7 @@ s14 = TaskDataset(index=14,
                   effector_motion=EffectorMotion.NoBall)
 
 tasks = [
-    s1, s3, s5, s6, s7, s9, s11, s12
+    s1, s3, s5, s6, s7, s9, s11, s12, s13, s14
 ]
 
 

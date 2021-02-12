@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description='Train a prediction model for defor
 parser.add_argument('--spec', help='Specify the model specification you want to train: motion, has_moved',
                     default='motion')
 parser.add_argument('--frame_step', type=int, default=1)
-parser.add_argument('--augment_rotation', type=bool, default=True)
+parser.add_argument('--augment_rotation', type=bool, default=False)
 parser.add_argument('--task_index', type=int, default=None)
 
 args, _ = parser.parse_known_args()
@@ -68,9 +68,9 @@ else:
     # Adapt model specs to task (store action parameters in global graph features)
     if task.effector_motion == Datasets.EffectorMotion.Ball:
         model.input_graph_format.global_format = ModelSpecification.GlobalFormat.NextEndEffectorXYZR
-    elif task.left_hand_motion in [Datasets.HandMotion.Circle, Datasets.HandMotion.Open]:
+    elif task.left_hand_motion in [Datasets.HandMotion.Circle, Datasets.HandMotion.Open, Datasets.HandMotion.Lift]:
         model.input_graph_format.global_format = ModelSpecification.GlobalFormat.NextHandPositionXYZ_Left
-    elif task.right_hand_motion in [Datasets.HandMotion.Circle, Datasets.HandMotion.Open]:
+    elif task.right_hand_motion in [Datasets.HandMotion.Circle, Datasets.HandMotion.Open, Datasets.HandMotion.Lift]:
         model.input_graph_format.global_format = ModelSpecification.GlobalFormat.NextHandPositionXYZ_Right
     else:
         raise NotImplementedError("Action encoding for task is not specified")

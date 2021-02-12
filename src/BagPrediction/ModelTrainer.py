@@ -139,8 +139,8 @@ class ModelTrainer(ModelLoader):
         valid_data = SimulatedData.SimulatedData.load(valid_path_to_topodict, valid_path_to_dataset)
 
         # Generators which transform the dataset into graphs for training the network
-        self.train_generator = ModelDataGenerator.DataGenerator(train_data, model, training=True)
-        self.valid_generator = ModelDataGenerator.DataGenerator(valid_data, model, training=False)
+        self.train_generator = ModelDataGenerator.DataGenerator(train_data, self.model, training=True)
+        self.valid_generator = ModelDataGenerator.DataGenerator(valid_data, self.model, training=False)
 
         # Get some example data that resembles the tensors that will be fed into update_step():
         batch_size = self.model.training_params.batch_size

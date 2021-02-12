@@ -39,10 +39,8 @@ class DataGenerator:
         # How many samples have been generated since the last epoch reset?
         self.generated_count = 0
 
-        keypoint_indices = specification.cloth_keypoints.indices
-        keypoint_edges = specification.cloth_keypoints.edges
-        self.keypoint_edges_from = np.array([keypoint_indices.index(f) for (f, _) in keypoint_edges])
-        self.keypoint_edges_to = np.array([keypoint_indices.index(t) for (_, t) in keypoint_edges])
+        self.keypoint_edges_from = specification.cloth_keypoints.keypoint_edges_from
+        self.keypoint_edges_to = specification.cloth_keypoints.keypoint_edges_to
 
     def next_batch(self, batch_size: int = None) -> Tuple:
         if batch_size is None:
@@ -103,7 +101,6 @@ class DataGenerator:
 
         node_data_next = np.vstack((cloth_data_next, rigid_data_next))
 
-
         # TensorFlow expects float32 values, the dataset contains float64 values
         effector_xyzr_current = np.float32(current_frame.get_effector_pose()).reshape(4)
         effector_xyzr_next = np.float32(next_frame.get_effector_pose()).reshape(4)
@@ -113,7 +110,6 @@ class DataGenerator:
         hand_left_xyz_next = next_frame.get_left_hand_position()
         hand_right_xyz_current = current_frame.get_right_hand_position()
         hand_right_xyz_next = next_frame.get_right_hand_position()
-
 
         input_global_format = self.specification.input_graph_format.global_format
         input_global_features, current_position = input_global_format.compute_features(
@@ -141,9 +137,10 @@ class DataGenerator:
         # Add random rotation to the position data (only during training)
         # zehang: if we do rotation for the input frame, we also need to rotate the effector future pose,
         #  and the ground truth, before calculating the edge attribute
-        augment_rotation = self.specification.training_params.augment_rotation
+        augment_rotation = hasattr(self.specification.training_params, 'augment_rotation') and \
+                           self.specification.training_params.augment_rotation
         if position_frame == ModelSpecification.PositionFrame.LocalToEndEffector and \
-                self.training and augment_rotation == True:
+                self.training and augment_rotation:
             # because we set the effector starting point as origin, we do rotation w.r.t. the verticle axis
             RYMat = SimulatedData.RandomRotateY_matrix()
             # rotate the effector future pose, the global features
@@ -162,7 +159,8 @@ class DataGenerator:
 
         output_edge_format = self.specification.output_graph_format.edge_format
         output_edge_features = output_edge_format.compute_features(node_data_next,
-                                                                   self.keypoint_edges_from, self.keypoint_edges_to)
+                                                                   self.specification.cloth_keypoints.keypoint_edges_from,
+                                                                   self.specification.cloth_keypoints.keypoint_edges_to)
 
         # Add input noise to the position data (only during training)
         positions_current = node_data_current[:, :3]
@@ -179,8 +177,8 @@ class DataGenerator:
 
         input_edge_format = self.specification.input_graph_format.edge_format
         input_edge_features = input_edge_format.compute_features(positions_current,
-                                                                 self.keypoint_edges_from,
-                                                                 self.keypoint_edges_to)
+                                                                 self.specification.cloth_keypoints.keypoint_edges_from,
+                                                                 self.specification.cloth_keypoints.keypoint_edges_to)
 
         num_nodes = node_data_current.shape[0]
         edge_index = [i for i in itertools.product(np.arange(num_nodes), repeat=2)]
