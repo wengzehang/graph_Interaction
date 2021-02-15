@@ -97,8 +97,9 @@ def create_input_graph_dict(specification: ModelSpecification.ModelSpecification
 
 
 class ModelFromSpecification(PredictionInterface, ABC):
-    def __init__(self, model: ModelSpecification.ModelSpecification):
-        self.model_loader = ModelLoader(model)
+    def __init__(self, model: ModelSpecification.ModelSpecification,
+                 models_root_path: str = None):
+        self.model_loader = ModelLoader(model, models_root_path)
         # We do not need to give example input data if we do not train the network
         self.model_loader.initialize_graph_net(None, None)
 
@@ -131,8 +132,9 @@ class ModelFromSpecification(PredictionInterface, ABC):
 
 
 class MotionModelFromSpecification(ModelFromSpecification):
-    def __init__(self, model: ModelSpecification.ModelSpecification):
-        super().__init__(model)
+    def __init__(self, model: ModelSpecification.ModelSpecification,
+                 models_root_path: str = None):
+        super().__init__(model, models_root_path)
 
         assert self.model_loader.model.output_graph_format.node_format == ModelSpecification.NodeFormat.XYZ, \
             "Output node format must be XYZ for the motion model"
@@ -171,8 +173,9 @@ def compute_moved_indices(predicted_nodes):
 class HasMovedMaskModelFromSpecification(ModelFromSpecification):
     def __init__(self,
                  motion_model: PredictionInterface,
-                 has_moved_spec: ModelSpecification.ModelSpecification):
-        super().__init__(has_moved_spec)
+                 has_moved_spec: ModelSpecification.ModelSpecification,
+                 models_root_path: str = None):
+        super().__init__(has_moved_spec, models_root_path)
 
         self.motion_model = motion_model
 
