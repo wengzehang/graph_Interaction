@@ -128,15 +128,16 @@ class Evaluation:
         return mean_error
 
 
-def create_prediction_model(model_name: str):
+def create_prediction_model(model_name: str, models_root_path: str):
     motion_model_1_spec = ModelSpecification.ModelSpecification(name="MotionModel_1")
-    motion_model_1 = MotionModelFromSpecification(motion_model_1_spec)
+    motion_model_1 = MotionModelFromSpecification(motion_model_1_spec, models_root_path)
     if model_name == "one-stage":
         return motion_model_1
 
     has_moved_model_1_spec = ModelSpecification.ModelSpecification(name="HasMovedModel_1")
     mask_model_1 = HasMovedMaskModelFromSpecification(motion_model_1,
-                                                      has_moved_model_1_spec)
+                                                      has_moved_model_1_spec,
+                                                      models_root_path)
     if model_name == "two-stage":
         return mask_model_1
 
@@ -144,7 +145,8 @@ def create_prediction_model(model_name: str):
     motion_model_5 = MotionModelFromSpecification(motion_model_5_spec)
     has_moved_model_5_spec = ModelSpecification.ModelSpecification(name="HasMovedModel_5")
     mask_model_5 = HasMovedMaskModelFromSpecification(motion_model_5,
-                                                      has_moved_model_5_spec)
+                                                      has_moved_model_5_spec,
+                                                      models_root_path)
 
     horizon_model = HorizonModel(mask_model_1, mask_model_5,
                                  start_horizon_frame=1)
@@ -200,7 +202,7 @@ if __name__ == '__main__':
             max_scenarios = dataset.num_scenarios
 
         model_name = args.model
-        model = create_prediction_model(model_name)
+        model = create_prediction_model(model_name, models_root_path)
 
         evaluation = Evaluation(model, max_scenario_index=max_scenarios)
 
