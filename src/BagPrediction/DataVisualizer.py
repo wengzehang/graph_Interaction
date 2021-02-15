@@ -51,6 +51,7 @@ class DataVisualizer:
         self.keypoint_edges_indices = [(keypoint_indices.index(f), keypoint_indices.index(t))
                                        for (f, t) in keypoint_edges]
 
+        self.useeffector = useeffector
         self.frames = self.load_frames()
 
     def load_frames(self) -> List[Frame]:
