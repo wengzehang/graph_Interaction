@@ -132,6 +132,7 @@ def create_prediction_model(model_name: str, models_root_path: str):
     motion_model_1_spec = ModelSpecification.ModelSpecification(name="MotionModel_1")
     motion_model_1 = MotionModelFromSpecification(motion_model_1_spec, models_root_path)
     if model_name == "one-stage":
+        print("Chosen model one-stage:", model_name)
         return motion_model_1
 
     has_moved_model_1_spec = ModelSpecification.ModelSpecification(name="HasMovedModel_1")
@@ -139,10 +140,11 @@ def create_prediction_model(model_name: str, models_root_path: str):
                                                       has_moved_model_1_spec,
                                                       models_root_path)
     if model_name == "two-stage":
+        print("Chosen model two-stage:", model_name)
         return mask_model_1
 
     motion_model_5_spec = ModelSpecification.ModelSpecification(name="MotionModel_5")
-    motion_model_5 = MotionModelFromSpecification(motion_model_5_spec)
+    motion_model_5 = MotionModelFromSpecification(motion_model_5_spec, models_root_path)
     has_moved_model_5_spec = ModelSpecification.ModelSpecification(name="HasMovedModel_5")
     mask_model_5 = HasMovedMaskModelFromSpecification(motion_model_5,
                                                       has_moved_model_5_spec,
@@ -152,6 +154,7 @@ def create_prediction_model(model_name: str, models_root_path: str):
                                  start_horizon_frame=1)
 
     if model_name == "horizon":
+        print("Chosen model horizon:", model_name)
         return horizon_model
 
     raise NotImplementedError("Model name was not handled in create_prediction_model()", model_name)
