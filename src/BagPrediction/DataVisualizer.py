@@ -1,14 +1,13 @@
 """Visualization for simulated data
-
+python DataVisualizer.py --task_index 1
 """
-
+import argparse
 import open3d
 import numpy as np
 from typing import List, Union, Tuple
 
 import SimulatedData
 import Datasets
-
 
 class Frame:
     def __init__(self, mesh_tx_list: List[Union[open3d.geometry.TriangleMesh, open3d.geometry.PointCloud]],
@@ -32,11 +31,10 @@ class Frame:
         self.cloth_pcd.colors = open3d.utility.Vector3dVector(self.cloth_pcd_colors)
         o3d_vis.update_geometry(self.cloth_pcd)
 
-
 class DataVisualizer:
     # The video_id/visid is the scenario index, i.e. a single task execution
     def __init__(self, data: SimulatedData, scenario_index: int,
-                 keypoint_indices: List[int], keypoint_edges: List[Tuple[int, int]]):
+                 keypoint_indices: List[int], keypoint_edges: List[Tuple[int, int]], useeffector: int):
         self.data = data
         self.scenario_index = scenario_index
         self.frame_index = 0
@@ -53,6 +51,7 @@ class DataVisualizer:
         self.keypoint_edges_indices = [(keypoint_indices.index(f), keypoint_indices.index(t))
                                        for (f, t) in keypoint_edges]
 
+        self.useeffector = useeffector
         self.frames = self.load_frames()
 
     def load_frames(self) -> List[Frame]:
@@ -118,24 +117,26 @@ class DataVisualizer:
 
         ##########################
         # effector
-        seq_effector = dataset[SimulatedData.EFFECTOR_KEY][self.scenario_index, frame_index, :][0]
-        effector_xyz = seq_effector[0:3]
-        effector_r = seq_effector[3]
-        mesh_sphere_effector = open3d.geometry.TriangleMesh.create_sphere(radius=effector_r)
-        # translate the sphere object according to the origin position
-        mesh_tx_effector = mesh_sphere_effector.translate(effector_xyz)
-        # mesh_tx_effector = mesh_sphere_effector
-        mesh_tx_effector.paint_uniform_color([0.1, 0.1, 0.7])
-        # mesh_tx.compute_vertex_normals()
-        # mesh_tx.paint_uniform_color([0.1, 0.1, 0.7])
-        mesh_tx_list.append(mesh_tx_effector)
 
-        total_points_e = seq_effector[0:3].reshape(-1, 3)
-        pcd_e = open3d.geometry.PointCloud()
-        pcd_e.points = open3d.utility.Vector3dVector(total_points_e)
-        color_point_e = np.zeros(total_points_e.shape)
-        pcd_e.colors = open3d.utility.Vector3dVector(color_point_e)
-        mesh_tx_list.append(pcd_e)
+        if useeffector ==  Datasets.EffectorMotion.Ball:
+            seq_effector = dataset[SimulatedData.EFFECTOR_KEY][self.scenario_index, frame_index, :][0]
+            effector_xyz = seq_effector[0:3]
+            effector_r = seq_effector[3]
+            mesh_sphere_effector = open3d.geometry.TriangleMesh.create_sphere(radius=effector_r)
+            # translate the sphere object according to the origin position
+            mesh_tx_effector = mesh_sphere_effector.translate(effector_xyz)
+            # mesh_tx_effector = mesh_sphere_effector
+            mesh_tx_effector.paint_uniform_color([0.1, 0.1, 0.7])
+            # mesh_tx.compute_vertex_normals()
+            # mesh_tx.paint_uniform_color([0.1, 0.1, 0.7])
+            mesh_tx_list.append(mesh_tx_effector)
+
+            total_points_e = seq_effector[0:3].reshape(-1, 3)
+            pcd_e = open3d.geometry.PointCloud()
+            pcd_e.points = open3d.utility.Vector3dVector(total_points_e)
+            color_point_e = np.zeros(total_points_e.shape)
+            pcd_e.colors = open3d.utility.Vector3dVector(color_point_e)
+            mesh_tx_list.append(pcd_e)
 
         # Add line set between keypoints
         line_set = open3d.geometry.LineSet()
@@ -250,11 +251,21 @@ class DataVisualizer:
 
 
 if __name__ == '__main__':
-    path_to_topodict = 'h5data/tasks/topo_train.pkl'
-    # path_to_dataset = 'h5data/train_sphere_sphere_m_r_soft_ballout.h5'
-    task = Datasets.s14
-    path_to_dataset = task.path_to_dataset('h5data/tasks/', Datasets.Subset.Training)
-    #path_to_dataset = 'h5data/train_sphere_sphere_f_f_soft_out_scene1_2TO5.h5'
+    parser = argparse.ArgumentParser(description='Visualize the training dataset for specific task.')
+    parser.add_argument('--task_index', help='Specify the dataset id you want to visualize.',
+                        type=int, default=12)
+    # parser.add_argument('--frame_step', type=int, default=1)
+
+    args, _ = parser.parse_known_args()
+
+    # parse the directory to the dataset
+    tasks_path = "./h5data/tasks"
+    task = Datasets.get_task_by_index(args.task_index)
+    path_to_dataset = task.path_to_dataset(tasks_path, Datasets.Subset.Training)
+    path_to_topodict = task.path_to_topodict(tasks_path, Datasets.Subset.Training)
+    useeffector = task.effector_motion
+
+    # load the data
     data = SimulatedData.SimulatedData.load(path_to_topodict, path_to_dataset)
 
     scenario_index = 0
@@ -262,6 +273,6 @@ if __name__ == '__main__':
     keypoint_edges = SimulatedData.keypoint_edges
     SimulatedData.validate_keypoint_graph(keypoint_indices, keypoint_edges)
 
-    data_vis = DataVisualizer(data, scenario_index, keypoint_indices, keypoint_edges)
+    data_vis = DataVisualizer(data, scenario_index, keypoint_indices, keypoint_edges, useeffector)
 
     data_vis.run()
