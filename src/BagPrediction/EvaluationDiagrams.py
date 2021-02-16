@@ -63,6 +63,8 @@ def save_error_plot(eval_path: str, filename: str):
     plt.savefig(path)
     print("Saved:", path)
 
+    plt.close(fig)
+
 
 def load_horizon_stats(eval_path: str, subset: Datasets.Subset, models: list) -> np.array:
     # Load errors
@@ -111,6 +113,8 @@ def save_horizon_plot(eval_path: str, subset: Datasets.Subset, filename: str):
     path = os.path.join(eval_path, filename)
     plt.savefig(path)
     print("Saved:", path)
+
+    plt.close(fig)
 
 
 if __name__ == '__main__':
