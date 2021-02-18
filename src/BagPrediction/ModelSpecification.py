@@ -160,10 +160,10 @@ class GlobalFormat(Enum):
                          hand_left_xyz_current: np.array, hand_left_xyz_next: np.array,
                          hand_right_xyz_current: np.array, hand_right_xyz_next: np.array
                          ):
-        current_position = effector_xyzr_current
-
         if self == GlobalFormat.Dummy:
             features = np.zeros(1, np.float32)
+
+            current_position = effector_xyzr_current[:3]
         elif self == GlobalFormat.NextEndEffectorXYZR:
             effector_position_diff = effector_xyzr_next[:3] - effector_xyzr_current[:3]
             effector_radius = effector_xyzr_current[3]

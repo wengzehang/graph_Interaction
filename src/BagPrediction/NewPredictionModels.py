@@ -19,8 +19,7 @@ def create_input_graph_dict(specification: ModelSpecification.ModelSpecification
                             current_frame: SimulatedData.Frame,
                             effector_xyzr_next: np.array,
                             hand_left_xyz_next: np.array,
-                            hand_right_xyz_next: np.array,
-                            training: bool = False):
+                            hand_right_xyz_next: np.array):
     keypoint_indices = specification.cloth_keypoints.indices
     # The grasped keypoint indices are now taken from the dataset instead of being hardcoded
     # fixed_keypoint_indices = specification.cloth_keypoints.fixed_indices
@@ -58,24 +57,18 @@ def create_input_graph_dict(specification: ModelSpecification.ModelSpecification
     else:
         raise NotImplementedError("Position frame not implemented")
 
-    movement_threshold = specification.training_params.movement_threshold
-
-    # Add input noise to the position data (only during training)
-    positions_current = node_data_current[:, :3]
-    noise_stddev = specification.training_params.input_noise_stddev
-    if training and noise_stddev is not None:
-        noise = np.random.normal([0.0, 0.0, 0.0], noise_stddev, positions_current.shape)
-        positions_current += noise
-
-    # Create input node features (after applying noise)
+    # Create input node features
     input_node_format = specification.input_graph_format.node_format
+
     # Next node data is only required for HasMovedClasses node format
     node_data_next = None
+    movement_threshold = specification.training_params.movement_threshold
     input_node_features = input_node_format.compute_features(node_data_current,
                                                              node_data_current, node_data_next,
                                                              movement_threshold)
 
     input_edge_format = specification.input_graph_format.edge_format
+    positions_current = node_data_current[:, :3]
     input_edge_features = input_edge_format.compute_features(positions_current,
                                                              specification.cloth_keypoints.keypoint_edges_from,
                                                              specification.cloth_keypoints.keypoint_edges_to)
@@ -93,7 +86,7 @@ def create_input_graph_dict(specification: ModelSpecification.ModelSpecification
         "receivers": node_edges_to,
     }
 
-    return input_graph_dict
+    return input_graph_dict, current_position
 
 
 class ModelFromSpecification(PredictionInterface, ABC):
@@ -113,22 +106,22 @@ class ModelFromSpecification(PredictionInterface, ABC):
                                   hand_left_xyz_next: np.array,
                                   hand_right_xyz_next: np.array):
         # Prepare input graph tuples
-        input_graph_dict = create_input_graph_dict(self.model_loader.model,
-                                                   frame, effector_xyzr_next,
-                                                   hand_left_xyz_next, hand_right_xyz_next)
+        input_graph_dict, current_position = create_input_graph_dict(self.model_loader.model,
+                                                                     frame, effector_xyzr_next,
+                                                                     hand_left_xyz_next, hand_right_xyz_next)
         input_graph_tuples = utils_tf.data_dicts_to_graphs_tuple([input_graph_dict])
-        return input_graph_tuples
+        return input_graph_tuples, current_position
 
     def predict_output_graph_tuples(self, frame: SimulatedData.Frame,
                                     effector_xyzr_next: np.array,
                                     hand_left_xyz_next: np.array,
                                     hand_right_xyz_next: np.array):
-        input_graph_tuples = self.create_input_graph_tuples(frame, effector_xyzr_next,
-                                                            hand_left_xyz_next, hand_right_xyz_next)
+        input_graph_tuples, current_position = self.create_input_graph_tuples(frame, effector_xyzr_next,
+                                                                              hand_left_xyz_next, hand_right_xyz_next)
 
         # Model prediction
         predicted_graph_tuples = self.model_loader.compiled_predict(input_graph_tuples)
-        return predicted_graph_tuples
+        return predicted_graph_tuples, current_position
 
 
 class MotionModelFromSpecification(ModelFromSpecification):
@@ -145,16 +138,17 @@ class MotionModelFromSpecification(ModelFromSpecification):
                       hand_right_xyz_next: np.array
                       ) -> PredictedFrame:
 
-        predicted_graph_tuples = self.predict_output_graph_tuples(frame, effector_xyzr_next,
-                                                                  hand_left_xyz_next, hand_right_xyz_next)
+        predicted_graph_tuples, current_position = self.predict_output_graph_tuples(frame, effector_xyzr_next,
+                                                                                    hand_left_xyz_next,
+                                                                                    hand_right_xyz_next)
 
         # Convert output graph tuple to PredictFrame
         predicted_nodes = predicted_graph_tuples[-1].nodes.numpy()
 
         if self.model_loader.model.position_frame == ModelSpecification.PositionFrame.LocalToEndEffector:
-            # Add the current effector position back to transform the center position to global coordinate
-            current_effector_position = frame.get_effector_pose()[0][:3]
-            predicted_nodes[:, :3] += current_effector_position
+            # Add the current position back to transform the center position to global coordinate
+            # The position is dependent on the input GlobalFormat (either effector or hand position)
+            predicted_nodes[:, :3] += current_position
 
         # The first entries are cloth keypoints (followed by rigid body nodes)
         num_keypoints = len(self.model_loader.model.cloth_keypoints.indices)
@@ -194,8 +188,8 @@ class HasMovedMaskModelFromSpecification(ModelFromSpecification):
         unmasked_pos_rigid = motion_prediction.rigid_body_positions
 
         # Predict has_moved mask
-        predicted_graph_tuples = self.predict_output_graph_tuples(frame, effector_xyzr_next,
-                                                                  hand_left_xyz_next, hand_right_xyz_next)
+        predicted_graph_tuples, _ = self.predict_output_graph_tuples(frame, effector_xyzr_next,
+                                                                     hand_left_xyz_next, hand_right_xyz_next)
         predicted_nodes = predicted_graph_tuples[-1].nodes.numpy()
 
         keypoint_indices = self.model_loader.model.cloth_keypoints.indices
