@@ -55,6 +55,9 @@ else:
 
     print("Chosen task:", args.task_index)
     task = Datasets.get_task_by_index(args.task_index)
+    if task is None:
+        print("Could not load task:", args.task_index)
+        exit()
 
     train_path_to_dataset = task.path_to_dataset(tasks_path, Datasets.Subset.Training)
     train_path_to_topodict = task.path_to_topodict(tasks_path, Datasets.Subset.Training)
