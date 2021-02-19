@@ -94,6 +94,17 @@ class BagStiffness(Enum):
     Soft = 0
     Stiff = 1
 
+    def filename(self):
+        switcher = {
+            BagStiffness.Soft: "soft",
+            BagStiffness.Stiff: "stiff",
+        }
+        result = switcher.get(self, None)
+        if result is None:
+            raise ValueError("BagStiffness is not handled in filename() function:", self)
+        else:
+            return result
+
 
 class TaskDataset:
     def __init__(self,
@@ -105,13 +116,14 @@ class TaskDataset:
                  effector_motion: EffectorMotion = EffectorMotion.NoBall
                  ):
         self.index = index
+        self.bag_stiffness = bag_stiffness
         self.bag_content = bag_content
         self.left_hand_motion = left_hand_motion
         self.right_hand_motion = right_hand_motion
         self.effector_motion = effector_motion
 
     def filename(self, subset: Subset) -> str:
-        return f"s{self.index}_soft_{self.bag_content.filename()}_" + \
+        return f"s{self.index}_{self.bag_stiffness.filename()}_{self.bag_content.filename()}_" + \
                f"{self.left_hand_motion.filename()}_{self.right_hand_motion.filename()}_" + \
                f"{self.effector_motion.filename()}_{subset.filename()}.h5"
 
