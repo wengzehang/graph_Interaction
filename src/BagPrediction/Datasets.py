@@ -90,9 +90,15 @@ class Subset(Enum):
         return None
 
 
+class BagStiffness(Enum):
+    Soft = 0
+    Stiff = 1
+
+
 class TaskDataset:
     def __init__(self,
                  index: int = 1,
+                 bag_stiffness: BagStiffness = BagStiffness.Soft,
                  bag_content: BagContent = BagContent.Empty,
                  left_hand_motion: HandMotion = HandMotion.Fixed,
                  right_hand_motion: HandMotion = HandMotion.Fixed,
@@ -177,8 +183,79 @@ s14 = TaskDataset(index=14,
                   right_hand_motion=HandMotion.Released,
                   effector_motion=EffectorMotion.NoBall)
 
+s15 = TaskDataset(index=15,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.BallInside,
+                  left_hand_motion=HandMotion.Fixed,
+                  right_hand_motion=HandMotion.Fixed,
+                  effector_motion=EffectorMotion.Ball)
+
+s17 = TaskDataset(index=17,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.BallInside,
+                  left_hand_motion=HandMotion.Open,
+                  right_hand_motion=HandMotion.Fixed,
+                  effector_motion=EffectorMotion.NoBall)
+
+s19 = TaskDataset(index=19,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.BallInside,
+                  left_hand_motion=HandMotion.Circle,
+                  right_hand_motion=HandMotion.Fixed,
+                  effector_motion=EffectorMotion.NoBall)
+
+s20 = TaskDataset(index=20,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.BallInside,
+                  left_hand_motion=HandMotion.Circle,
+                  right_hand_motion=HandMotion.Released,
+                  effector_motion=EffectorMotion.NoBall)
+
+s21 = TaskDataset(index=21,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.Empty,
+                  left_hand_motion=HandMotion.Fixed,
+                  right_hand_motion=HandMotion.Fixed,
+                  effector_motion=EffectorMotion.Ball)
+
+s23 = TaskDataset(index=23,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.Empty,
+                  left_hand_motion=HandMotion.Open,
+                  right_hand_motion=HandMotion.Fixed,
+                  effector_motion=EffectorMotion.NoBall)
+
+s25 = TaskDataset(index=25,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.Empty,
+                  left_hand_motion=HandMotion.Circle,
+                  right_hand_motion=HandMotion.Fixed,
+                  effector_motion=EffectorMotion.NoBall)
+
+s26 = TaskDataset(index=26,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.Empty,
+                  left_hand_motion=HandMotion.Circle,
+                  right_hand_motion=HandMotion.Released,
+                  effector_motion=EffectorMotion.NoBall)
+
+s27 = TaskDataset(index=27,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.BallInside,
+                  left_hand_motion=HandMotion.Lift,
+                  right_hand_motion=HandMotion.Released,
+                  effector_motion=EffectorMotion.NoBall)
+
+s28 = TaskDataset(index=28,
+                  bag_stiffness=BagStiffness.Stiff,
+                  bag_content=BagContent.Empty,
+                  left_hand_motion=HandMotion.Lift,
+                  right_hand_motion=HandMotion.Released,
+                  effector_motion=EffectorMotion.NoBall)
+
 tasks = [
-    s1, s3, s5, s6, s7, s9, s11, s12, s13, s14
+    s1, s3, s5, s6, s7, s9, s11, s12, s13, s14,
+    s15, s17, s19, s20, s21, s23, s25, s26, s27, s28,
 ]
 
 
