@@ -106,6 +106,26 @@ class BagStiffness(Enum):
             return result
 
 
+class Action(Enum):
+    PushObject = 0
+    MoveHandleCircular = 1
+    OpenBag = 2
+    LiftBag = 3
+
+    def plot_name(self):
+        switcher = {
+            Action.PushObject: "Pushing an Object into the Bag",
+            Action.MoveHandleCircular: "Handle Motion Along Circular Trajectory",
+            Action.OpenBag: "Opening the Bag",
+            Action.LiftBag: "Lifting the Bag",
+        }
+        result = switcher.get(self, None)
+        if result is None:
+            raise ValueError("Action is not handled in plot_name() function:", self)
+        else:
+            return result
+
+
 class TaskDataset:
     def __init__(self,
                  index: int = 1,
@@ -121,6 +141,17 @@ class TaskDataset:
         self.left_hand_motion = left_hand_motion
         self.right_hand_motion = right_hand_motion
         self.effector_motion = effector_motion
+
+    def action(self):
+        if self.effector_motion == EffectorMotion.Ball:
+            return Action.PushObject
+        if self.left_hand_motion == HandMotion.Circle:
+            return Action.MoveHandleCircular
+        if self.left_hand_motion == HandMotion.Open:
+            return Action.OpenBag
+        if self.left_hand_motion == HandMotion.Lift:
+            return Action.LiftBag
+        raise NotImplementedError("Could not determine action for task", self)
 
     def filename(self, subset: Subset) -> str:
         return f"s{self.index}_{self.bag_stiffness.filename()}_{self.bag_content.filename()}_" + \

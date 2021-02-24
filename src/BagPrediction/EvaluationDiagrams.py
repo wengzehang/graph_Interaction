@@ -1,16 +1,23 @@
 """
-Generate diagrams from the evalution data
+Generate diagrams from the evaluation data
 """
 
 import Datasets
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 
-from typing import Tuple
+from typing import Tuple, List
 import argparse
 import csv
 import os
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Palatino"],
+})
 
 # We only evaluate single time step prediction errors for the one-stage and two-stage models.
 SINGLE_TIME_STEP_PREDICTION_MODELS = [
@@ -176,7 +183,7 @@ def save_horizon_plot(eval_path: str, subset: Datasets.Subset, filename: str):
 
 
 def save_error_bar_plot(error_stats, eval_path: str, filename: str):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(4, 3))
     ax.set_ylabel('Mean Position Error')
 
     models = SINGLE_TIME_STEP_PREDICTION_MODELS
@@ -210,6 +217,72 @@ def save_error_bar_plot(error_stats, eval_path: str, filename: str):
     plt.close(fig)
 
 
+def group_tasks_per_action():
+    # Group tasks by action
+    tasks_per_action = dict()
+    for task in Datasets.tasks:
+        action = task.action()
+        tasks_per_action.setdefault(action, []).append(task)
+    return tasks_per_action
+
+
+def load_long_horizon_stats_for_task(task: Datasets.TaskDataset):
+    task_eval_path = f"./models/task-{task.index}/evaluation"
+    errors = load_horizon_stats(task_eval_path, Datasets.Subset.Test, LONG_HORIZON_PREDICTION_MODELS)
+    return errors
+
+
+def load_long_horizon_stats_for_tasks(tasks: List[Datasets.TaskDataset]):
+    stats_per_task = []
+    for task in tasks:
+        task_stats = load_long_horizon_stats_for_task(task)
+        if task_stats is not None:
+            stats_per_task.append(task_stats)
+    return stats_per_task
+
+
+def load_long_horizon_stats():
+    # Group tasks by action
+    tasks_per_action = group_tasks_per_action()
+    stats_per_action = dict()
+    for action, tasks in tasks_per_action.items():
+        stats_per_action[action] = load_long_horizon_stats_for_tasks(tasks)
+    return stats_per_action
+
+
+def save_long_horizon_plot(eval_path: str, action: Datasets.Action, stats: List[np.array]):
+    errors = np.mean(stats, axis=0)
+    stddevs = np.std(stats, axis=0)
+
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.set_ylabel('Mean Position Error')
+
+    x_pos = np.arange(errors.shape[1])
+
+    model_names = [model['name'] for model in LONG_HORIZON_PREDICTION_MODELS]
+
+    ax.set_xticks(x_pos)
+    ax.set_title(f"Long Horizon Prediction: {action.plot_name()}")
+
+    for i, frame_errors in enumerate(errors):
+        ax.plot(x_pos, frame_errors, label=model_names[i])
+        stddev = stddevs[i]
+        ax.fill_between(x_pos, frame_errors - stddev, frame_errors + stddev,
+                        alpha=0.2)
+
+    ax.legend(loc='upper left')
+    ax.set_ylim(0)
+    ax.set_xlim(0, x_pos[-1])
+
+    plt.tight_layout()
+    filename = f"evaluation_long_horizon_{action.name}.png"
+    path = os.path.join(eval_path, filename)
+    plt.savefig(path)
+    print("Saved:", path)
+
+    plt.close(fig)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate a prediction model for deformable bag manipulation')
     parser.add_argument('--plot_stddev_whiskers', type=bool, default=True)
@@ -224,6 +297,10 @@ if __name__ == '__main__':
 
     error_stats = load_complete_error_stats()
     save_error_bar_plot(error_stats, eval_path, "evaluation_error_bar_plot.png")
+
+    long_horizon_stats = load_long_horizon_stats()
+    for action, stats in long_horizon_stats.items():
+        save_long_horizon_plot(eval_path, action, stats)
 
     if False:
         models = [
