@@ -254,24 +254,24 @@ def save_long_horizon_plot(eval_path: str, action: Datasets.Action, stats: List[
     errors = np.mean(stats, axis=0)
     stddevs = np.std(stats, axis=0)
 
-    fig, ax = plt.subplots(figsize=(12, 4))
+    fig, ax = plt.subplots(figsize=(5, 3))
     ax.set_ylabel('Mean Position Error')
+    ax.set_xlabel('Time Step')
 
     x_pos = np.arange(errors.shape[1])
 
     model_names = [model['name'] for model in LONG_HORIZON_PREDICTION_MODELS]
 
-    ax.set_xticks(x_pos)
-    ax.set_title(f"Long Horizon Prediction: {action.plot_name()}")
+    ax.set_xticks(x_pos[0::5])
+    ax.set_title(f"Action: {action.plot_name()}")
 
     for i, frame_errors in enumerate(errors):
         ax.plot(x_pos, frame_errors, label=model_names[i])
         stddev = stddevs[i]
-        ax.fill_between(x_pos, frame_errors - stddev, frame_errors + stddev,
-                        alpha=0.2)
+        ax.fill_between(x_pos, frame_errors - stddev, frame_errors + stddev, alpha=0.2)
 
     ax.legend(loc='upper left')
-    ax.set_ylim(0)
+    ax.set_ylim(0, 1.45)
     ax.set_xlim(0, x_pos[-1])
 
     plt.tight_layout()
