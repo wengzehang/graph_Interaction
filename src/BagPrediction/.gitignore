@@ -1,5 +1,7 @@
 .idea/
 __pycache__/
 h5data/
+h5data
 venv/
 models/
+h5data_archive
