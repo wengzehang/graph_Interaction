@@ -12,8 +12,20 @@ import argparse
 import csv
 import os
 
+# We only evaluate single time step prediction errors for the one-stage and two-stage models.
+SINGLE_TIME_STEP_PREDICTION_MODELS = [
+    {"id": "one-stage", "name": "One-Stage"},
+    {"id": "two-stage", "name": "Two-Stage"},
+]
 
-def load_error_stats(eval_path: str, subset: Datasets.Subset, models: list) -> Tuple[np.array, np.array]:
+# For the horizon prediction, we evaluate all three models
+LONG_HORIZON_PREDICTION_MODELS = [
+    {"id": "one-stage", "name": "One-Stage"},
+    {"id": "two-stage", "name": "Two-Stage"},
+    {"id": "horizon", "name": "Mixed-Horizon"}
+]
+
+def load_error_stats_for_subset(eval_path: str, subset: Datasets.Subset, models: list) -> Tuple[np.array, np.array]:
     # Load errors
     mean_errors = np.zeros(len(models))
     stddevs = np.zeros(len(models))
@@ -35,6 +47,52 @@ def load_error_stats(eval_path: str, subset: Datasets.Subset, models: list) -> T
     return mean_errors, stddevs
 
 
+def load_task_error_stats(eval_path: str):
+    # The
+    models = SINGLE_TIME_STEP_PREDICTION_MODELS
+
+    errors_per_subset = dict()
+
+    for subset in Datasets.Subset:
+        mean_errors, _ = load_error_stats_for_subset(eval_path, subset, models)
+        if mean_errors is None:
+            return None
+
+        errors_per_subset[subset] = mean_errors
+
+    return errors_per_subset
+
+
+def load_complete_error_stats():
+    models = SINGLE_TIME_STEP_PREDICTION_MODELS
+
+    error_stats = dict()
+    for subset in Datasets.Subset:
+        error_stats[subset] = []
+        for i, model in enumerate(models):
+            error_stats[subset].append([])
+
+    for task in Datasets.tasks:
+        # Use a separate path to store the models for each task
+        eval_path = f"./models/task-{task.index}/evaluation"
+
+        if not os.path.exists(eval_path):
+            print(f"No evaluation directory found for task {task.index}: {eval_path}")
+            continue
+
+        errors_per_subset = load_task_error_stats(eval_path)
+        if errors_per_subset is None:
+            continue
+
+        # FIXME: There must be a better way to construct this data structure
+        for subset in Datasets.Subset:
+            for i, model in enumerate(models):
+                error = errors_per_subset[subset][i]
+                error_stats[subset][i].append(error)
+
+    return error_stats
+
+
 def save_error_plot(eval_path: str, filename: str):
     fig, ax = plt.subplots()
     ax.set_ylabel('Mean Position Error')
@@ -47,7 +105,7 @@ def save_error_plot(eval_path: str, filename: str):
     ax.set_title(f"Single Frame Prediction: Mean Position Error")
 
     for i, set in enumerate(Datasets.Subset):
-        mean_errors, stddevs = load_error_stats(eval_path, set, models)
+        mean_errors, stddevs = load_error_stats_for_subset(eval_path, set, models)
         if mean_errors is None:
             continue
 
@@ -117,36 +175,79 @@ def save_horizon_plot(eval_path: str, subset: Datasets.Subset, filename: str):
     plt.close(fig)
 
 
+def save_error_bar_plot(error_stats, eval_path: str, filename: str):
+    fig, ax = plt.subplots()
+    ax.set_ylabel('Mean Position Error')
+
+    models = SINGLE_TIME_STEP_PREDICTION_MODELS
+    model_names = [model['name'] for model in models]
+    x_pos = np.arange(len(model_names))
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(model_names)
+    ax.set_title(f"Single Time Step Prediction Error")
+
+    for i, subset in enumerate(Datasets.Subset):
+        errors_in_subset = error_stats[subset]
+        # Calculate the mean prediction error (and standard deviation) over all tasks
+        mean_errors = [np.mean(task_errors) for task_errors in errors_in_subset]
+        stddevs = [np.std(task_errors) for task_errors in errors_in_subset]
+
+        pos = x_pos + (i - 1) * 0.25
+
+        yerr = stddevs if plot_stddev_whiskers else None
+        ax.bar(pos, mean_errors, width=0.25, yerr=yerr, label=subset.name,
+               align='center', alpha=0.5, ecolor='black', capsize=10)
+
+    ax.legend()
+    ax.set_ylim(0)
+
+    plt.tight_layout()
+    path = os.path.join(eval_path, filename)
+    plt.savefig(path)
+    print("Saved:", path)
+
+    plt.close(fig)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate a prediction model for deformable bag manipulation')
-    parser.add_argument('--plot_stddev_whiskers', type=bool, default=False)
+    parser.add_argument('--plot_stddev_whiskers', type=bool, default=True)
 
     args, _ = parser.parse_known_args()
 
-    plot_stddev_whiskers = args.plot_stddev_whiskers
+    plot_stddev_whiskers = args.plot_stddev_whiskers#
 
-    models = [
-        {"id": "one-stage", "name": "One-step"},
-        {"id": "two-stage", "name": "Two-step"},
-        {"id": "horizon", "name": "Horizon"}
-    ]
+    eval_path = "./evaluation"
+    if not os.path.exists(eval_path):
+        os.makedirs(eval_path)
 
-    for task in Datasets.tasks:
-        print("Creating evaluation diagrams for task:", task.index)
+    error_stats = load_complete_error_stats()
+    save_error_bar_plot(error_stats, eval_path, "evaluation_error_bar_plot.png")
 
-        # Use a separate path to store the models for each task
-        eval_path = f"./models/task-{task.index}/evaluation"
+    if False:
+        models = [
+            {"id": "one-stage", "name": "One-step"},
+            {"id": "two-stage", "name": "Two-step"},
+            {"id": "horizon", "name": "Horizon"}
+        ]
 
-        if not os.path.exists(eval_path):
-            print(f"No evaluation directory found for task {task.index}: {eval_path}")
-            continue
+        for task in Datasets.tasks:
+            print("Creating evaluation diagrams for task:", task.index)
 
-        plot_filename = "plot_error_bars.png"
-        save_error_plot(eval_path, plot_filename)
+            # Use a separate path to store the models for each task
+            eval_path = f"./models/task-{task.index}/evaluation"
 
-        for subset in Datasets.Subset:
-            plot_filename = f"plot_horizon_bars_{subset.filename()}.png"
-            save_horizon_plot(eval_path, subset, plot_filename)
+            if not os.path.exists(eval_path):
+                print(f"No evaluation directory found for task {task.index}: {eval_path}")
+                continue
+
+            plot_filename = "plot_error_bars.png"
+            save_error_plot(eval_path, plot_filename)
+
+            for subset in Datasets.Subset:
+                plot_filename = f"plot_horizon_bars_{subset.filename()}.png"
+                save_horizon_plot(eval_path, subset, plot_filename)
 
 
 
