@@ -14,24 +14,13 @@ from SimulatedData import *
 # from DataVisualizer import Frame
 import DataVisualizer
 
-import GraphRepresentation
-import GraphNetworkModules
-import DataGenerator
 import Datasets
-from graph_nets import utils_tf
 import copy
-import sonnet as snt
-import tensorflow as tf
 import argparse
-import os
 import tqdm
 
 
 from Evaluation import create_prediction_model
-
-# # TODO: This should be configurable
-# kpset = [759, 545, 386, 1071, 429, 943, 820, 1013, 1124, 1212, 1269, 674, 685, 1236]
-
 
 class KeypointDataVisualizer:
     # The video_id/visid is the scenario index, i.e. a single task execution
