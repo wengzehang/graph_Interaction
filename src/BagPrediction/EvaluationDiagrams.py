@@ -3,6 +3,7 @@ Generate diagrams from the evaluation data
 """
 
 import Datasets
+import SimulatedData
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -32,7 +33,10 @@ LONG_HORIZON_PREDICTION_MODELS = [
     {"id": "horizon", "name": "Mixed-Horizon"}
 ]
 
-def load_error_stats_for_subset(eval_path: str, subset: Datasets.Subset, models: list) -> Tuple[np.array, np.array]:
+
+def load_error_stats_for_subset(eval_path: str, subset: Datasets.Subset, models: list,
+                                average_rigid_num: float = 3.0) -> Tuple[np.array, np.array]:
+    cloth_keypoint_num = len(SimulatedData.keypoint_indices)
     # Load errors
     mean_errors = np.zeros(len(models))
     stddevs = np.zeros(len(models))
@@ -48,20 +52,42 @@ def load_error_stats_for_subset(eval_path: str, subset: Datasets.Subset, models:
             rows = [row for row in reader]
             # The first row contains the column names, so skip it
             values = np.array(rows[1:][0], np.float32)
-            mean_errors[i] = values[0]
+            cloth_mean_error = values[0]
+            rigid_mean_error = values[2]
+            error_sum = (cloth_keypoint_num * cloth_mean_error + average_rigid_num * rigid_mean_error)
+            mean_errors[i] = error_sum / (cloth_keypoint_num + average_rigid_num)
             stddevs[i] = values[1]
 
     return mean_errors, stddevs
 
 
-def load_task_error_stats(eval_path: str):
+def get_average_number_of_rigid_objects(task: Datasets.TaskDataset, subset: Datasets.Subset):
+    try:
+        data_root_path = "./h5data/tasks"
+        topo_path = task.path_to_topodict(data_root_path, subset)
+        dataset_path = task.path_to_dataset(data_root_path, subset)
+        data = SimulatedData.SimulatedData.load(topo_path, dataset_path)
+
+        num_scenarios = data.num_scenarios
+        num_rigid = []
+        for i in range(num_scenarios):
+            num_rigid.append(data.scenario(i).frame(0).num_rigid)
+
+        return np.mean(num_rigid)
+    except:
+        print("Could not load dataset and determine average number of rigid objects:", dataset_path)
+        return 3.0
+
+
+def load_task_error_stats(eval_path: str, task: Datasets.TaskDataset):
     # The
     models = SINGLE_TIME_STEP_PREDICTION_MODELS
 
     errors_per_subset = dict()
 
     for subset in Datasets.Subset:
-        mean_errors, _ = load_error_stats_for_subset(eval_path, subset, models)
+        average_rigid_num = get_average_number_of_rigid_objects(task, subset)
+        mean_errors, _ = load_error_stats_for_subset(eval_path, subset, models, average_rigid_num)
         if mean_errors is None:
             return None
 
@@ -70,7 +96,7 @@ def load_task_error_stats(eval_path: str):
     return errors_per_subset
 
 
-def load_complete_error_stats():
+def load_complete_error_stats(tasks: List[Datasets.TaskDataset]):
     models = SINGLE_TIME_STEP_PREDICTION_MODELS
 
     error_stats = dict()
@@ -79,7 +105,7 @@ def load_complete_error_stats():
         for i, model in enumerate(models):
             error_stats[subset].append([])
 
-    for task in Datasets.tasks:
+    for task in tasks:
         # Use a separate path to store the models for each task
         eval_path = f"./models/task-{task.index}/evaluation"
 
@@ -87,11 +113,10 @@ def load_complete_error_stats():
             print(f"No evaluation directory found for task {task.index}: {eval_path}")
             continue
 
-        errors_per_subset = load_task_error_stats(eval_path)
+        errors_per_subset = load_task_error_stats(eval_path, task)
         if errors_per_subset is None:
             continue
 
-        # FIXME: There must be a better way to construct this data structure
         for subset in Datasets.Subset:
             for i, model in enumerate(models):
                 error = errors_per_subset[subset][i]
@@ -116,7 +141,7 @@ def save_error_plot(eval_path: str, filename: str):
         if mean_errors is None:
             continue
 
-        pos = x_pos + (i-1) * 0.25
+        pos = x_pos + (i - 1) * 0.25
 
         yerr = stddevs if plot_stddev_whiskers else None
         ax.bar(pos, mean_errors, width=0.25, yerr=yerr, align='center', alpha=0.5, ecolor='black', capsize=10)
@@ -217,6 +242,41 @@ def save_error_bar_plot(error_stats, eval_path: str, filename: str):
     plt.close(fig)
 
 
+def save_error_bar_plot_stiffness(stiffness_stats, eval_path: str, filename: str):
+    fig, ax = plt.subplots(figsize=(4, 3))
+    ax.set_ylabel('Mean Position Error')
+
+    models = SINGLE_TIME_STEP_PREDICTION_MODELS
+    model_names = [model['name'] for model in models]
+    x_pos = np.arange(len(model_names))
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(model_names)
+    ax.set_title(f"Comparison of Material Stiffness")
+
+    for i, stiffness in enumerate(Datasets.BagStiffness):
+        errors_per_stiffness = stiffness_stats[stiffness]
+        # Calculate the mean prediction error (and standard deviation) over all tasks
+        mean_errors = [np.mean(task_errors) for task_errors in errors_per_stiffness]
+        stddevs = [np.std(task_errors) for task_errors in errors_per_stiffness]
+
+        pos = x_pos + (i - 1) * 0.25
+
+        yerr = stddevs if plot_stddev_whiskers else None
+        ax.bar(pos, mean_errors, width=0.25, yerr=yerr, label=stiffness.name,
+               align='center', alpha=0.5, ecolor='black', capsize=10)
+
+    ax.legend()
+    ax.set_ylim(0)
+
+    plt.tight_layout()
+    path = os.path.join(eval_path, filename)
+    plt.savefig(path)
+    print("Saved:", path)
+
+    plt.close(fig)
+
+
 def group_tasks_per_action():
     # Group tasks by action
     tasks_per_action = dict()
@@ -224,6 +284,15 @@ def group_tasks_per_action():
         action = task.action()
         tasks_per_action.setdefault(action, []).append(task)
     return tasks_per_action
+
+
+def group_tasks_per_stiffness():
+    # Group tasks by action
+    tasks_per_stiffness = dict()
+    for task in Datasets.tasks:
+        stiffness = task.bag_stiffness
+        tasks_per_stiffness.setdefault(stiffness, []).append(task)
+    return tasks_per_stiffness
 
 
 def load_long_horizon_stats_for_task(task: Datasets.TaskDataset):
@@ -289,18 +358,28 @@ if __name__ == '__main__':
 
     args, _ = parser.parse_known_args()
 
-    plot_stddev_whiskers = args.plot_stddev_whiskers#
+    plot_stddev_whiskers = args.plot_stddev_whiskers  #
 
     eval_path = "./evaluation"
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
 
-    error_stats = load_complete_error_stats()
+    error_stats = load_complete_error_stats(Datasets.tasks)
     save_error_bar_plot(error_stats, eval_path, "evaluation_error_bar_plot.png")
 
     long_horizon_stats = load_long_horizon_stats()
     for action, stats in long_horizon_stats.items():
         save_long_horizon_plot(eval_path, action, stats)
+
+    # Errors by material stiffness:
+    tasks_per_stiffness = group_tasks_per_stiffness()
+    stiffness_stats = dict()
+    for stiffness in Datasets.BagStiffness:
+        tasks = tasks_per_stiffness[stiffness]
+        error_stats = load_complete_error_stats(tasks)
+        stiffness_stats[stiffness] = error_stats[Datasets.Subset.Test]
+
+    save_error_bar_plot_stiffness(stiffness_stats, eval_path, "evaluation_error_bar_plot_stiffness.png")
 
     if False:
         models = [
@@ -325,8 +404,3 @@ if __name__ == '__main__':
             for subset in Datasets.Subset:
                 plot_filename = f"plot_horizon_bars_{subset.filename()}.png"
                 save_horizon_plot(eval_path, subset, plot_filename)
-
-
-
-
-
