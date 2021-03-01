@@ -70,9 +70,10 @@ class KeypointDataVisualizer:
             # create the sphere in open3d
             mesh_sphere = open3d.geometry.TriangleMesh.create_sphere(radius=r)
             # translate the sphere object according to the origin position
-            mesh_tx = mesh_sphere.translate(xyz)
-            # mesh_tx.compute_vertex_normals()
-            # mesh_tx.paint_uniform_color([0.1, 0.1, 0.7])
+            mesh_tx: open3d.geometry.TriangleMesh = mesh_sphere.translate(xyz)
+            #mesh_tx.compute_triangle_normals()
+            mesh_tx.compute_vertex_normals()
+            mesh_tx.paint_uniform_color([0.1, 0.1, 0.7])
             mesh_tx_list.append(mesh_tx)
 
         seq = self.dataset_cloth[self.scenario_index, frame_index, :]  # (numpoint, 3)
@@ -85,6 +86,8 @@ class KeypointDataVisualizer:
         cloth_mesh.vertices = open3d.utility.Vector3dVector(seq)
         cloth_mesh.triangles = open3d.utility.Vector3iVector(conn)
         cloth_mesh.vertex_colors = open3d.utility.Vector3dVector(np.full((seq.shape[0], 3), 0.5))
+        #cloth_mesh.compute_triangle_normals()
+        cloth_mesh.compute_vertex_normals()
 
         if self.show_cloth_mesh:
             mesh_tx_list.append(cloth_mesh)
@@ -203,9 +206,14 @@ class KeypointDataVisualizer:
     def run(self):
         o3d_vis = open3d.visualization.VisualizerWithKeyCallback()
         o3d_vis.create_window()
-        o3d_vis.get_render_option().point_size = 10
-        o3d_vis.get_render_option().line_width = 5
-        o3d_vis.get_render_option().show_coordinate_frame = True
+        render_option: open3d.visualization.RenderOption = o3d_vis.get_render_option()
+        render_option.point_size = 10
+        render_option.line_width = 5
+        render_option.light_on = True
+        render_option.mesh_shade_option = open3d.visualization.MeshShadeOption.Color
+        render_option.mesh_color_option = open3d.visualization.MeshColorOption.Color
+        render_option.mesh_show_back_face = True
+        render_option.show_coordinate_frame = True
 
         self.register_callbacks(o3d_vis)
 
@@ -329,8 +337,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Visualize the predicting results for deformable bag manipulation')
     parser.add_argument('--model', help='Specify the model name: one-stage, two-stage, horizon',
-                        default='one-stage')
-    parser.add_argument('--max_scenarios', type=int, default=3)
+                        default='horizon')
+    parser.add_argument('--max_scenarios', type=int, default=1)
     parser.add_argument('--set_name', type=str, default="train")
     parser.add_argument('--task_index', type=int, default=3)
 
