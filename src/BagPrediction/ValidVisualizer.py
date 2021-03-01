@@ -30,6 +30,7 @@ class KeypointDataVisualizer:
         self.scenario_index = scenario_index
         self.frame_index = 0
         self.keypoint_index = 0
+        self.playing_video = False
         shape = data.dataset[MESH_KEY].shape
         self.num_scenarios = shape[0]
         self.num_frames = shape[1]
@@ -171,6 +172,10 @@ class KeypointDataVisualizer:
         if self.keypoint_index >= self.num_mesh_points:
             self.keypoint_index = 0
 
+    def on_start_video(self, o3d_vis: open3d.visualization.VisualizerWithKeyCallback):
+        self.frame_index = 0
+        self.playing_video = True
+
     def on_toggle_cloth_mesh(self, o3d_vis: open3d.visualization.VisualizerWithKeyCallback):
         self.show_cloth_mesh = not self.show_cloth_mesh
 
@@ -182,6 +187,7 @@ class KeypointDataVisualizer:
         GLFW_KEY_UP = 265
         GLFW_KEY_A = 65
         GLFW_KEY_S = 83
+        GLFW_KEY_V = 86
         GLFW_KEY_SPACE = 32
 
         o3d_vis.register_key_callback(GLFW_KEY_ESCAPE, self.on_quit)
@@ -191,6 +197,7 @@ class KeypointDataVisualizer:
         o3d_vis.register_key_callback(GLFW_KEY_UP, self.on_next_scenario)
         o3d_vis.register_key_callback(GLFW_KEY_A, self.on_prev_keypoint)
         o3d_vis.register_key_callback(GLFW_KEY_S, self.on_next_keypoint)
+        o3d_vis.register_key_callback(GLFW_KEY_V, self.on_start_video)
         o3d_vis.register_key_callback(GLFW_KEY_SPACE, self.on_toggle_cloth_mesh)
 
     def run(self):
@@ -202,15 +209,34 @@ class KeypointDataVisualizer:
 
         self.register_callbacks(o3d_vis)
 
+        # TODO: Keep time difference to advance frames
+        last_time = datetime.now()
+
         old_scenario_index = -1
         old_frame_index = -1
         old_keypoint_index = -1
         old_show_cloth_mesh = self.show_cloth_mesh
+        old_playing_video = self.playing_video
         self.running = True
         while self.running:
             # running, scenario_index and frame_index are modified by the keypress events
             scenario_changed = self.scenario_index != old_scenario_index
             show_cloth_mesh_changed = self.show_cloth_mesh != old_show_cloth_mesh
+
+            if old_playing_video != self.playing_video:
+                # Reset the frame advance timer if we start playing video
+                last_time = datetime.now()
+                old_playing_video = self.playing_video
+
+            current_time = datetime.now()
+            time_difference = (current_time - last_time).total_seconds()
+            if self.playing_video and time_difference > 0.1:
+                self.frame_index += 1
+                if self.frame_index >= len(self.frames) - 1:
+                    # Stop playing video at the last frame
+                    self.frame_index = len(self.frames) - 2
+                    self.playing_video = False
+                last_time = current_time
 
             old_scenario_index = self.scenario_index
             if scenario_changed or show_cloth_mesh_changed:
@@ -304,9 +330,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Visualize the predicting results for deformable bag manipulation')
     parser.add_argument('--model', help='Specify the model name: one-stage, two-stage, horizon',
                         default='one-stage')
-    parser.add_argument('--max_scenarios', type=int, default=10)
-    parser.add_argument('--set_name', type=str, default=None)
-    parser.add_argument('--task_index', type=int, default=1)
+    parser.add_argument('--max_scenarios', type=int, default=3)
+    parser.add_argument('--set_name', type=str, default="train")
+    parser.add_argument('--task_index', type=int, default=3)
 
     args, _ = parser.parse_known_args()
 
