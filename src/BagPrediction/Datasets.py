@@ -114,7 +114,7 @@ class Action(Enum):
 
     def plot_name(self):
         switcher = {
-            Action.PushObject: "Pushing an Object into the Bag",
+            Action.PushObject: "Pushing an Object towards the Bag",
             Action.MoveHandleCircular: "Handle Motion Along Circular Trajectory",
             Action.OpenBag: "Opening the Bag",
             Action.LiftBag: "Lifting the Bag",

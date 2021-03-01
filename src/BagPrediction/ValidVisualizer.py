@@ -4,7 +4,7 @@
 
 from NewPredictionModels import *
 import open3d
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 from typing import List, Union, Tuple
 
@@ -13,6 +13,7 @@ from SimulatedData import *
 
 # from DataVisualizer import Frame
 import DataVisualizer
+from LineMesh import LineMesh
 
 import Datasets
 import copy
@@ -100,13 +101,14 @@ class KeypointDataVisualizer:
             color_point[i] = np.array([0.8, 0.0, 0.0])
         color_point[self.keypoint_index] = np.array([1.0, 0.0, 0.0])
 
-        if self.show_cloth_mesh:
-            cloth_pcd.points = open3d.utility.Vector3dVector(total_points)
-            cloth_pcd.colors = open3d.utility.Vector3dVector(color_point)
-        else:
-            cloth_pcd.points = open3d.utility.Vector3dVector(total_points[self.keypoint_indices])
-            cloth_pcd.colors = open3d.utility.Vector3dVector(color_point[self.keypoint_indices])
+        #if self.show_cloth_mesh:
+        #    cloth_pcd.points = open3d.utility.Vector3dVector(total_points)
+        #    cloth_pcd.colors = open3d.utility.Vector3dVector(color_point)
+        #else:
+        cloth_pcd.points = open3d.utility.Vector3dVector(total_points[self.keypoint_indices])
+        cloth_pcd.colors = open3d.utility.Vector3dVector(color_point[self.keypoint_indices])
         mesh_tx_list.append(cloth_pcd)
+
 
         ##########################
         # effector
@@ -136,7 +138,12 @@ class KeypointDataVisualizer:
         line_set.lines = open3d.utility.Vector2iVector(np.array(self.keypoint_edges_indices))
         line_set.colors = open3d.utility.Vector3dVector(np.full((len(self.keypoint_edges_indices), 3),
                                                                 [1.0, 0.0, 1.0]))
-        mesh_tx_list.append(line_set)
+        if False:
+            mesh_tx_list.append(line_set)
+
+        line_mesh = LineMesh(line_set.points, line_set.lines, line_set.colors, radius=0.01)
+        for geom in line_mesh.cylinder_segments:
+            mesh_tx_list.append(geom)
 
         return DataVisualizer.Frame(mesh_tx_list, cloth_mesh, cloth_pcd, color_point)
 
@@ -207,8 +214,9 @@ class KeypointDataVisualizer:
         o3d_vis = open3d.visualization.VisualizerWithKeyCallback()
         o3d_vis.create_window()
         render_option: open3d.visualization.RenderOption = o3d_vis.get_render_option()
-        render_option.point_size = 10
-        render_option.line_width = 5
+        render_option.point_size = 15
+        # Line width is no longer supported by newer OpenGL versions
+        render_option.line_width = 10
         render_option.light_on = True
         render_option.mesh_shade_option = open3d.visualization.MeshShadeOption.Color
         render_option.mesh_color_option = open3d.visualization.MeshColorOption.Color
@@ -225,6 +233,11 @@ class KeypointDataVisualizer:
         old_keypoint_index = -1
         old_show_cloth_mesh = self.show_cloth_mesh
         old_playing_video = self.playing_video
+        frame_times = []
+
+        max_frame_time = 0.10
+        frame_time = max_frame_time
+
         self.running = True
         while self.running:
             # running, scenario_index and frame_index are modified by the keypress events
@@ -238,12 +251,17 @@ class KeypointDataVisualizer:
 
             current_time = datetime.now()
             time_difference = (current_time - last_time).total_seconds()
-            if self.playing_video and time_difference > 0.1:
+            if self.playing_video and time_difference > frame_time:
                 self.frame_index += 1
+                frame_times.append(time_difference)
                 if self.frame_index >= len(self.frames) - 1:
                     # Stop playing video at the last frame
                     self.frame_index = len(self.frames) - 2
                     self.playing_video = False
+                    print("Mean frame time:", np.mean(frame_times))
+                    frame_times = []
+                # If we used more time than the maximal frame time we try to render the next frame faster
+                frame_time = max_frame_time - (time_difference - frame_time)
                 last_time = current_time
 
             old_scenario_index = self.scenario_index
@@ -256,7 +274,7 @@ class KeypointDataVisualizer:
             frame = self.frames[self.frame_index]
             if keypoint_changed:
                 was_keypoint = old_keypoint_index in self.keypoint_indices
-                frame.update_keypoint(old_keypoint_index, self.keypoint_index, was_keypoint, o3d_vis)
+                #frame.update_keypoint(old_keypoint_index, self.keypoint_index, was_keypoint, o3d_vis)
                 old_keypoint_index = self.keypoint_index
 
             if scenario_changed or frame_changed or keypoint_changed or show_cloth_mesh_changed:
@@ -290,6 +308,7 @@ class Evaluation_Visual:
     def evaluate(self, data: SimulatedData) -> KeypointDataVisualizer:
         newdata = copy.copy(data)
         self.data_vis = KeypointDataVisualizer(newdata, 0, self.keypoint_indices, self.keypoint_edges, useeffector=self.useeffector)
+        self.data_vis.show_cloth_mesh = False
 
         self.calculate_keypoint_pos(data)
         return self.data_vis
